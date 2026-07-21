@@ -58,11 +58,16 @@ function portalHost(domain: unknown): string {
 }
 
 function resolveBookingLogo(tenant: TenantRow, sourceLanding: any, targetLanding: any, fastTrackLanding: any): LogoResolution {
+  // Broker-Flow: Bewerber kennt die Vermittler-Marke von der Source-Landing —
+  // deshalb Broker-Tenant → Source-Landing (Broker) VOR Fast-Track/Target (Zielarbeitgeber).
+  if (tenant.logo_url && !/^https:\/\//i.test(String(tenant.logo_url).trim())) {
+    console.warn("[send-booking-confirmation] tenant.logo_url ist nicht absolut https:// — Fallback auf Landing-Logo/Wortmarke", { tenant_id: tenant.id, logo_url: tenant.logo_url });
+  }
   return resolveEmailLogo([
     { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
+    { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
     { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
     { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
-    { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
   ]);
 }
 
