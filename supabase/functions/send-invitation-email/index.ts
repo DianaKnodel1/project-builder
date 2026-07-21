@@ -312,13 +312,25 @@ serve(async (req) => {
       } catch (e) { console.warn("[send-invitation-email] logo fallback failed:", (e as any)?.message ?? e); }
     }
 
-    const logo = resolveEmailLogo([
-      { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
-      { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
-      { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
-      { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
-    ]);
-    const logoMetadata = { email_logo_url: logo.url, email_logo_source: logo.source, email_logo_reason: logo.reason, email_logo_candidates: logo.candidates };
+    const isBrokerFlow = typeof routingKind === "string" && routingKind.startsWith("broker_");
+    if (tenant.logo_url && !/^https:\/\//i.test(String(tenant.logo_url).trim())) {
+      console.warn("[send-invitation-email] tenant.logo_url ist nicht absolut https:// — Wortmarke wird verwendet, sofern kein Landing-Logo greift", { tenant_id: tenant.id, logo_url: tenant.logo_url });
+    }
+    const logoCandidates = isBrokerFlow
+      ? [
+          { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
+          { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
+          { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
+          { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
+        ]
+      : [
+          { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
+          { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
+          { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
+          { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
+        ];
+    const logo = resolveEmailLogo(logoCandidates);
+    const logoMetadata = { email_logo_url: logo.url, email_logo_source: logo.source, email_logo_reason: logo.reason, email_logo_candidates: logo.candidates, email_logo_flow: isBrokerFlow ? "broker" : "default" };
 
     const { renderEmail } = await import("../_shared/email-wrapper.ts");
     const { html } = renderEmail({
