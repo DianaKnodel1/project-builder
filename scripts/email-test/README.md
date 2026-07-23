@@ -8,27 +8,17 @@ ohne Wartezeit auf reale Trigger.
 ```bash
 export SUPABASE_URL="https://<PROJECT>.supabase.co"      # oder self-hosted URL
 export SERVICE_ROLE="<SERVICE_ROLE_KEY>"                 # aus /opt/apps/portal/.env
+export DATABASE_URL="postgresql://…"                     # nur für Stufe 4 + 5
 export TEST_TENANT_ID="<uuid>"                           # ein realer Tenant
-export TEST_LANDING_ID="<uuid>"                          # optional: für Landing-Logo
-export TEST_EMAIL="dein-postfach@example.com"            # Empfänger für Live-Tests
+export TEST_LANDING_ID="<uuid>"                          # Landing mit Domain
+export TEST_EMAIL="test+chain@deine-domain.de"           # MUSS mit test+ beginnen
 ```
 
 ## Ebene 1 — Rendering-Preview (Sekunden, KEIN Versand)
 
-Alle Templates auf einmal rendern (Subject + Text-Preview):
-
-```bash
-curl -s -X POST "$SUPABASE_URL/functions/v1/email-preview" \
-  -H "Authorization: Bearer $SERVICE_ROLE" \
-  -H "Content-Type: application/json" \
-  -d "{\"tenant_id\": \"$TEST_TENANT_ID\", \"landing_id\": \"$TEST_LANDING_ID\"}" \
-  | jq '.rendered[] | {kind, subject, text_preview}'
-```
-
 Ein einzelnes Template als HTML im Browser ansehen:
 
 ```bash
-# öffnet ein einzelnes Template als HTML — zum Anschauen in Browser oder Mail-Client
 curl -s -X POST "$SUPABASE_URL/functions/v1/email-preview?format=html" \
   -H "Authorization: Bearer $SERVICE_ROLE" \
   -H "Content-Type: application/json" \
@@ -36,54 +26,79 @@ curl -s -X POST "$SUPABASE_URL/functions/v1/email-preview?format=html" \
   > /tmp/preview.html && xdg-open /tmp/preview.html
 ```
 
-Verfügbare `template`-Werte:
-`application_received`, `booking_confirmation`, `interview_invite_30min`,
-`no_booking_24h`, `no_booking_72h`, `no_show_24h`,
-`rebook_after_cancel_24h`, `rebook_after_cancel_72h`,
-`welcome_invitation`, `signup_confirmation`, `password_reset`,
-`reminder_invite`, `reminder_confirm_email`, `reminder_complete_registration`.
-
 ## Ebene 2 — Einmal-Testversand an deine eigene Adresse
 
 ```bash
 curl -s -X POST "$SUPABASE_URL/functions/v1/email-preview" \
   -H "Authorization: Bearer $SERVICE_ROLE" \
   -H "Content-Type: application/json" \
-  -d "{\"template\": \"application_received\", \"tenant_id\": \"$TEST_TENANT_ID\", \"send_to\": \"$TEST_EMAIL\"}" \
-  | jq
+  -d "{\"template\": \"application_received\", \"tenant_id\": \"$TEST_TENANT_ID\", \"send_to\": \"$TEST_EMAIL\"}"
 ```
 
-- Betreff bekommt `[PREVIEW]`-Präfix, damit du echte Mails nicht verwechselst.
-- Sendet über Tenant-SMTP — testet also auch die Zustellkette.
-- Nur EIN Template pro Request, nur EINE Adresse.
-
 ## Ebene 3 — Dry-Run gegen echte Cron-Daten
-
-Alle vier Cron-Endpunkte gleichzeitig, nichts wird gesendet, du bekommst
-die Liste „wer wäre jetzt dran":
 
 ```bash
 bash scripts/email-test/dry-run-all.sh
 ```
 
-## Ebene 4 — Echten Cron-Send auslösen (mit vordatiertem Test-Bewerber)
+## Ebene 4 — Einzelnen Cron-Send auslösen (mit vordatiertem Test-Bewerber)
 
-1. Lege einen dedizierten Test-Bewerber an (per UI oder API), z. B.
-   `test+booking@deine-domain.de`.
-2. Setze den State mit einem Snippet aus `sql-snippets/` (Zeit vordatieren).
-3. Trigger die passende Function:
+State-Snippets in `sql-snippets/chain-*.sql` einzeln laufen lassen und
+danach die passende Function triggern. Siehe `set-test-states.sql` für
+Kommentare zu jeder Manipulation.
+
+## Ebene 5 — Komplette Kette mit EINEM Skript
+
+Sendet nacheinander **alle 14 automatischen Mails** an `$TEST_EMAIL` – jede
+mit echter State-Manipulation und echtem Cron-Aufruf.
 
 ```bash
-curl -s -X POST "$SUPABASE_URL/functions/v1/send-application-reminders" \
-  -H "Authorization: Bearer $SERVICE_ROLE" -d '{}'
+bash scripts/email-test/run-full-chain.sh
 ```
 
-**Wichtig:** Immer erst `SELECT id, email FROM applications WHERE …`
-ausführen, um sicherzustellen, dass nur der Test-Bewerber getroffen wird.
+Was das Skript macht (pro Stufe):
+
+1. Lädt `sql-snippets/chain-<n>-*.sql`, das per `psql` den Test-Bewerber in
+   den richtigen Zustand versetzt (backdated `created_at`, Termin auf
+   `cancelled`, o. ä.) und die passende Zeile aus
+   `application_reminder_log` löscht.
+2. Ruft die zuständige Edge Function auf (`send-application-reminders`,
+   `send-booking-confirmation`, `send-appointment-reminders`,
+   `send-invitation-email`, `send-signup-confirmation`,
+   `resend-signup-confirmation`, `send-password-reset`, `send-reminders`).
+3. Wartet `PAUSE_SECONDS` (Standard 6s) gegen SMTP-Rate-Limit.
+
+Ablauf im Postfach:
+
+```
+ 1/14 application_received            → test+chain@…
+ 2/14 booking_confirmation            → test+chain@…
+ 3/14 interview_invite_30min          → test+chain@…
+ 4/14 no_booking_24h                  → test+chain@…
+ 5/14 no_booking_72h                  → test+chain@…
+ 6/14 no_show_24h                     → test+chain@…
+ 7/14 rebook_after_cancel_24h         → test+chain@…
+ 8/14 rebook_after_cancel_72h         → test+chain@…
+ 9/14 welcome_invitation              → test+chain@…
+10/14 signup_confirmation             → test+chain@…
+11/14 signup_confirmation_resend      → test+chain@…
+12/14 password_reset                  → test+chain@…
+13/14 reminder_invite                 → test+chain@…
+14/14 reminder_complete_registration  → test+chain@…
+```
+
+Einzelne Stufen überspringen:
+
+```bash
+SKIP="no_show_24h,password_reset" bash scripts/email-test/run-full-chain.sh
+```
+
+Am Ende fragt das Skript, ob `chain-99-cleanup.sql` laufen soll (Zeiten
+zurücksetzen, Log leeren) – damit ist der nächste Durchlauf sofort möglich.
 
 ## Sicherheits-Regeln
 
+- **`TEST_EMAIL` muss mit `test+` beginnen** – sonst bricht das Skript ab.
+- Alle SQL-Updates sind auf **genau eine** `applications`-Row per E-Mail gescoped.
 - Preview-Endpoint: nur Service-Role.
-- `send_to`: nur eine Adresse pro Request, mit `[PREVIEW]`-Präfix.
-- Zeit-Manipulation: immer auf einen `test+…@`-Bewerber beschränken.
-- Nach dem Test: Test-Bewerber löschen oder `created_at` zurücksetzen.
+- Nach dem Test: Cleanup ausführen oder Test-Bewerber löschen.
