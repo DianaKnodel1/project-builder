@@ -27,7 +27,11 @@ SELECT a.tenant_id, a.id, s.id,
        'scheduled', now(), now()
   FROM applications a
   JOIN availability_schedules s
-    ON s.landing_page_id = :'landing_id'::uuid
+    ON s.landing_page_id IN (
+      SELECT id FROM landing_pages
+       WHERE id = :'landing_id'::uuid
+          OR id = (SELECT linked_fasttrack_landing_id FROM landing_pages WHERE id = :'landing_id'::uuid)
+    )
    AND s.active = true
  WHERE a.email = :'test_email'
  ORDER BY s.created_at

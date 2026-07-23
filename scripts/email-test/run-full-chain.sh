@@ -110,8 +110,8 @@ invoke_cron_safely() {
 
   echo "   dry_run: candidates=$total, target=$candidates"
 
-  if [[ "$candidates" != "1" ]]; then
-    echo "   ❌ Abbruch: $fn würde $candidates Mal an $TEST_EMAIL senden, total=$total"
+  if [[ "$candidates" != "1" || "$total" != "1" ]]; then
+    echo "   ❌ Abbruch: $fn würde $candidates Mal an $TEST_EMAIL und insgesamt $total Mal senden."
     echo "   Output: $dryOut"
     return 1
   fi
@@ -167,7 +167,7 @@ preflight() {
   local tenant_exists landing_exists schedule_exists
   tenant_exists=$(psql_value "SELECT count(*) FROM tenants WHERE id = '$TEST_TENANT_ID';")
   landing_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_LANDING_ID';")
-  schedule_exists=$(psql_value "SELECT count(*) FROM availability_schedules WHERE landing_page_id = '$TEST_LANDING_ID' AND active = true;")
+  schedule_exists=$(psql_value "SELECT count(*) FROM availability_schedules WHERE active = true AND landing_page_id IN (SELECT id FROM landing_pages WHERE id = '$TEST_LANDING_ID' OR id = (SELECT linked_fasttrack_landing_id FROM landing_pages WHERE id = '$TEST_LANDING_ID'));")
 
   if [[ "$tenant_exists" != "1" ]]; then
     echo "FEHLER: TEST_TENANT_ID wurde nicht gefunden."
