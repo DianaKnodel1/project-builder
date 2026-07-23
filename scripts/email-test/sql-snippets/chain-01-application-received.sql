@@ -12,6 +12,13 @@ WHERE application_id IN (
 DELETE FROM reminder_log
 WHERE email = :'test_email';
 
+-- Alte Testtermine entfernen. So bekommt jeder Durchlauf eine neue Appointment-ID
+-- und kollidiert nicht mit früheren Versand-Logs der Terminbestätigung.
+DELETE FROM interview_appointments
+WHERE application_id IN (
+  SELECT id FROM applications WHERE email = :'test_email'
+);
+
 -- Bewerber upsert
 INSERT INTO applications (
   email, first_name, last_name, full_name, tenant_id,
@@ -30,7 +37,6 @@ ON CONFLICT (email) DO UPDATE
       status = EXCLUDED.status,
       booking_status = NULL,
       scheduled_at = NULL,
-      accepted_at = NULL,
       created_at = now(),
       updated_at = now();
 

@@ -4,7 +4,7 @@
 BEGIN;
 
 UPDATE applications
-   SET accepted_at = now(),
+   SET status = 'akzeptiert',
        booking_status = 'accepted',
        updated_at = now()
  WHERE email = :'test_email';

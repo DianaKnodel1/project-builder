@@ -56,7 +56,7 @@ psql_run() {
 
 invoke_fn() {
   local fn="$1"
-  local body="${2:-{}}"
+  local body="${2:-"{}"}"
   curl -fsS -X POST "$SUPABASE_URL/functions/v1/$fn" \
     -H "Authorization: Bearer $SERVICE_ROLE" \
     -H "Content-Type: application/json" \
@@ -91,6 +91,7 @@ invoke_cron_safely() {
     echo "   ⚠️  FORCE_SEND=true — Sicherheits-Check übersprungen!"
     local out
     out=$(invoke_fn "$fn" "$body")
+    require_success_response "$out" >/dev/null || return 1
     echo "$out" | jq -c '{sent, skipped, failed, candidates}'
     return 0
   fi
@@ -100,6 +101,7 @@ invoke_cron_safely() {
   dryBody=$(echo "$body" | jq -c '. + {dry_run:true}')
   local dryOut
   dryOut=$(invoke_fn "$fn" "$dryBody")
+  require_success_response "$dryOut" >/dev/null || return 1
 
   local candidates
   candidates=$(echo "$dryOut" | jq -r --arg email "$TEST_EMAIL" '[.results[]? | select(.to == $email)] | length')
@@ -117,6 +119,14 @@ invoke_cron_safely() {
   # 2) realer Versand
   local out
   out=$(invoke_fn "$fn" "$body")
+  require_success_response "$out" >/dev/null || return 1
+  local sent failed
+  sent=$(echo "$out" | jq -r '(.sent // 0)')
+  failed=$(echo "$out" | jq -r '(.failed // 0)')
+  if [[ "$sent" != "1" || "$failed" != "0" ]]; then
+    echo "   ❌ Versand nicht eindeutig erfolgreich: $out"
+    return 1
+  fi
   echo "$out" | jq -c '{sent, skipped, failed, candidates}'
 }
 
@@ -154,9 +164,10 @@ preflight() {
   echo "Vorabcheck: Datenbank, Tenant und Landing …"
   psql_value "SELECT 1;" >/dev/null
 
-  local tenant_exists landing_exists
+  local tenant_exists landing_exists schedule_exists
   tenant_exists=$(psql_value "SELECT count(*) FROM tenants WHERE id = '$TEST_TENANT_ID';")
   landing_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_LANDING_ID';")
+  schedule_exists=$(psql_value "SELECT count(*) FROM availability_schedules WHERE landing_page_id = '$TEST_LANDING_ID' AND active = true;")
 
   if [[ "$tenant_exists" != "1" ]]; then
     echo "FEHLER: TEST_TENANT_ID wurde nicht gefunden."
@@ -166,13 +177,21 @@ preflight() {
     echo "FEHLER: TEST_LANDING_ID wurde nicht gefunden."
     return 1
   fi
+  if [[ "$schedule_exists" == "0" ]]; then
+    echo "FEHLER: Für TEST_LANDING_ID existiert kein aktiver Verfügbarkeitskalender."
+    return 1
+  fi
   echo "Vorabcheck erfolgreich."
 }
 
 # ---------- Stufe 1: Bewerbung eingegangen ----------------------------------
 stage_application_received() {
-  psql_run "$SNIP/chain-01-application-received.sql"
-  load_app_context
+  psql_run "$SNIP/chain-01-application-received.sql" || return 1
+  load_app_context || return 1
+  if [[ -z "$APP_ID" || -z "$TENANT_DOMAIN" ]]; then
+    echo "   ❌ Bewerbung oder Tenant-Domain konnte nicht geladen werden."
+    return 1
+  fi
   local link="https://portal.${TENANT_DOMAIN}/termin/buchen/${APP_ID}?ref=${APP_ID}"
   local out
   out=$(invoke_fn send-invitation-email \
@@ -187,50 +206,50 @@ stage_application_received() {
 
 # ---------- Stufe 2: Termin bestätigt ---------------------------------------
 stage_booking_confirmation() {
-  psql_run "$SNIP/chain-02-booking-confirmation.sql"
+  psql_run "$SNIP/chain-02-booking-confirmation.sql" || return 1
   invoke_cron_safely "booking_confirmation" "Terminbestätigung" "send-booking-confirmation" "{}"
 }
 
 # ---------- Stufe 3: Interview-Einladung 30min ------------------------------
 stage_interview_invite_30min() {
-  psql_run "$SNIP/chain-03-interview-invite-30min.sql"
+  psql_run "$SNIP/chain-03-interview-invite-30min.sql" || return 1
   invoke_cron_safely "interview_invite_30min" "Interview-Einladung" "send-appointment-reminders" "{}"
 }
 
 # ---------- Stufe 4: No-Booking 24h -----------------------------------------
 stage_no_booking_24h() {
-  psql_run "$SNIP/chain-04-no-booking-24h.sql"
+  psql_run "$SNIP/chain-04-no-booking-24h.sql" || return 1
   invoke_cron_safely "no_booking_24h" "Kein Termin 24h" "send-application-reminders" "{}"
 }
 
 # ---------- Stufe 5: No-Booking 72h -----------------------------------------
 stage_no_booking_72h() {
-  psql_run "$SNIP/chain-05-no-booking-72h.sql"
+  psql_run "$SNIP/chain-05-no-booking-72h.sql" || return 1
   invoke_cron_safely "no_booking_72h" "Kein Termin 72h" "send-application-reminders" "{}"
 }
 
 # ---------- Stufe 6: No-Show 24h --------------------------------------------
 stage_no_show_24h() {
-  psql_run "$SNIP/chain-06-no-show-24h.sql"
+  psql_run "$SNIP/chain-06-no-show-24h.sql" || return 1
   invoke_cron_safely "no_show_24h" "No-Show" "send-application-reminders" "{}"
 }
 
 # ---------- Stufe 7: Rebook 24h nach Absage ---------------------------------
 stage_rebook_after_cancel_24h() {
-  psql_run "$SNIP/chain-07-rebook-after-cancel-24h.sql"
+  psql_run "$SNIP/chain-07-rebook-after-cancel-24h.sql" || return 1
   invoke_cron_safely "rebook_after_cancel_24h" "Rebook 24h" "send-application-reminders" "{}"
 }
 
 # ---------- Stufe 8: Rebook 72h nach Absage ---------------------------------
 stage_rebook_after_cancel_72h() {
-  psql_run "$SNIP/chain-08-rebook-after-cancel-72h.sql"
+  psql_run "$SNIP/chain-08-rebook-after-cancel-72h.sql" || return 1
   invoke_cron_safely "rebook_after_cancel_72h" "Rebook 72h" "send-application-reminders" "{}"
 }
 
 # ---------- Stufe 9: Willkommens-/Registrierungs-Einladung ------------------
 stage_welcome_invitation() {
-  psql_run "$SNIP/chain-09-welcome-invitation.sql"
-  load_app_context
+  psql_run "$SNIP/chain-09-welcome-invitation.sql" || return 1
+  load_app_context || return 1
   local link="https://portal.${TENANT_DOMAIN}/register?app=${APP_ID}"
   invoke_fn send-invitation-email \
     "$(jq -nc \
@@ -277,7 +296,7 @@ stage_password_reset() {
 # Hinweis: Diese Stufe wird aktuell vom Edge-Function "send-reminders" immer
 # übersprungen, da der automatische invite-Reminder deaktiviert ist.
 stage_reminder_invite() {
-  psql_run "$SNIP/chain-13-reminder-invite.sql"
+  psql_run "$SNIP/chain-13-reminder-invite.sql" || return 1
   local out
   out=$(invoke_fn send-reminders \
     "$(jq -nc '{dry_run:true, only_type:"invite", ignore_quiet_hours:true}')")
@@ -286,7 +305,7 @@ stage_reminder_invite() {
 
 # ---------- Stufe 14: Registrierung abschließen (Drip) ----------------------
 stage_reminder_complete_registration() {
-  psql_run "$SNIP/chain-14-reminder-complete-registration.sql"
+  psql_run "$SNIP/chain-14-reminder-complete-registration.sql" || return 1
   invoke_fn send-reminders \
     "$(jq -nc '{dry_run:false, only_type:"confirm_email", ignore_quiet_hours:true}')" \
     | jq -c '{by_type, skipped: .skipped, sent: .sent}'
