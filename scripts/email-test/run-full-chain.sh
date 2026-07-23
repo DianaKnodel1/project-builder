@@ -349,8 +349,9 @@ stage_reminder_complete_registration() {
 # ============================================================================
 echo "=========================================================================="
 echo "E-Mail-Kette starten für: $TEST_EMAIL"
-echo "Tenant:  $TEST_TENANT_ID"
-echo "Landing: $TEST_LANDING_ID"
+echo "Tenant:  $TEST_TENANT_ID (Broker/Source-Tenant)"
+echo "Source:  $TEST_SOURCE_LANDING_ID (Vermittlung)"
+echo "Target:  $TEST_TARGET_LANDING_ID (Fast-Track / Ziel)"
 echo "Pause zwischen Mails: ${PAUSE_SECONDS}s   SKIP=$SKIP"
 echo "=========================================================================="
 
