@@ -21,6 +21,9 @@ UPDATE interview_appointments
 DELETE FROM application_reminder_log
  WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email');
 
+DELETE FROM reminder_log
+ WHERE email = :'test_email';
+
 COMMIT;
 
 SELECT 'cleanup done' AS status, email, booking_status, created_at, accepted_at
