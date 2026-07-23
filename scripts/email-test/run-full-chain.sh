@@ -24,7 +24,7 @@
 # =============================================================================
 set -euo pipefail
 
-SUITE_VERSION="2026-07-23.3"
+SUITE_VERSION="2026-07-23.4"
 
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
@@ -74,10 +74,23 @@ psql_run() {
 invoke_fn() {
   local fn="$1"
   local body="${2:-"{}"}"
-  curl -fsS -X POST "$SUPABASE_URL/functions/v1/$fn" \
+  local resp status_line body_out status
+  resp=$(curl -sS -X POST "$SUPABASE_URL/functions/v1/$fn" \
     -H "Authorization: Bearer $SERVICE_ROLE" \
     -H "Content-Type: application/json" \
-    -d "$body"
+    -w $'\n__HTTP_STATUS__:%{http_code}' \
+    -d "$body") || {
+    echo "   ❌ curl-Fehler bei $fn" >&2
+    return 1
+  }
+  status_line="${resp##*$'\n'__HTTP_STATUS__:}"
+  body_out="${resp%$'\n'__HTTP_STATUS__:*}"
+  status="$status_line"
+  if [[ "$status" =~ ^[0-9]+$ ]] && (( status >= 400 )); then
+    echo "   ❌ HTTP $status von $fn: $body_out" >&2
+    return 1
+  fi
+  printf '%s' "$body_out"
 }
 
 require_success_response() {
