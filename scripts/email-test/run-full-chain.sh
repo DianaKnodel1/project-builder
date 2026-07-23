@@ -196,10 +196,10 @@ preflight() {
   # Der Runner und alle SQL-Snippets müssen immer als kompletter Ordner
   # synchronisiert werden. Alte Snippets verwendeten ON CONFLICT auf Spalten
   # ohne Unique-Constraint und dürfen nicht mehr ausgeführt werden.
-  if grep -Rqs --include='chain-*.sql' 'ON[[:space:]]\+CONFLICT' "$SNIP"; then
+  if grep -REqs --include='chain-*.sql' '^[[:space:]]*ON[[:space:]]+CONFLICT' "$SNIP"; then
     echo "FEHLER: Veraltete SQL-Snippets gefunden (ON CONFLICT)."
     echo "Bitte den kompletten Ordner scripts/email-test/ erneut synchronisieren."
-    grep -Rn --include='chain-*.sql' 'ON[[:space:]]\+CONFLICT' "$SNIP" || true
+    grep -REn --include='chain-*.sql' '^[[:space:]]*ON[[:space:]]+CONFLICT' "$SNIP" || true
     return 1
   fi
 
