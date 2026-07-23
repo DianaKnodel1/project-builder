@@ -4,7 +4,7 @@ BEGIN;
 
 UPDATE applications
    SET created_at = now() - interval '25 hours',
-       booking_status = NULL,
+       booking_status = 'none',
        scheduled_at = NULL,
        updated_at = now()
  WHERE email = :'test_email';
