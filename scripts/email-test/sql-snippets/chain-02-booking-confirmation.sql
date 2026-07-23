@@ -5,7 +5,7 @@
 BEGIN;
 
 UPDATE applications
-   SET booking_status = 'confirmed',
+   SET booking_status = 'scheduled',
        scheduled_at = now() + interval '2 days',
        updated_at = now()
  WHERE email = :'test_email';
