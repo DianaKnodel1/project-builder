@@ -24,7 +24,7 @@
 # =============================================================================
 set -euo pipefail
 
-SUITE_VERSION="2026-07-23.5"
+SUITE_VERSION="2026-07-23.6"
 
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
@@ -243,17 +243,17 @@ preflight() {
     return 1
   fi
 
-  # Versionen vor 2026-07-23.3 fügten booking_status teilweise als NULL ein.
-  # Der Check verhindert, dass ein alter Runner mit einem neuen oder alten
-  # Einzelsnippet vermischt wird und erst beim INSERT scheitert.
+  # Stufe 1 muss booking_status='none' setzen und magic_token beim Insert
+  # generieren, sonst überspringen send-appointment-reminders und die Rebook-
+  # Stufen die Test-Bewerbung mit reason='no_magic_token'.
   if [[ ! -f "$application_received_snippet" ]] \
-    || ! grep -Fqs "booking_status, created_at, updated_at" "$application_received_snippet" \
-    || ! grep -Fqs "'none', now(), now()" "$application_received_snippet"; then
+    || ! grep -Fqs "booking_status, magic_token, magic_token_expires_at" "$application_received_snippet" \
+    || ! grep -Fqs "gen_random_bytes(24)" "$application_received_snippet"; then
     echo "FEHLER: Stufe 1 ist veraltet oder unvollständig synchronisiert."
-    echo "Erwartet: booking_status wird im Test-Insert ausdrücklich auf 'none' gesetzt."
+    echo "Erwartet: booking_status='none' und magic_token werden im Test-Insert gesetzt."
     echo "Bitte den kompletten Ordner scripts/email-test/ erneut synchronisieren."
     echo "Backend-Prüfung:"
-    echo "  grep -nE \"booking_status|'none'\" $application_received_snippet"
+    echo "  grep -nE \"booking_status|magic_token\" $application_received_snippet"
     return 1
   fi
 
