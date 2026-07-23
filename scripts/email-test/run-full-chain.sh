@@ -58,6 +58,8 @@ psql_run() {
     -v test_email="$TEST_EMAIL" \
     -v tenant_id="$TEST_TENANT_ID" \
     -v landing_id="$TEST_LANDING_ID" \
+    -v source_landing_id="$TEST_SOURCE_LANDING_ID" \
+    -v target_landing_id="$TEST_TARGET_LANDING_ID" \
     "$@" \
     -f "$file"
 }
