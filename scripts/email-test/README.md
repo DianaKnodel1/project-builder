@@ -12,7 +12,7 @@ export DATABASE_URL="postgresql://…"                     # nur für Stufe 4 + 
 export TEST_TENANT_ID="<broker-tenant-uuid>"             # Tenant der Source-Landing (Vermittlung)
 export TEST_SOURCE_LANDING_ID="<uuid>"                   # Vermittlungs-Landing (flow_type='broker')
 export TEST_TARGET_LANDING_ID="<uuid>"                   # Fast-Track-/Ziel-Landing
-export TEST_EMAIL="test+chain@deine-domain.de"           # MUSS mit test+ beginnen
+export TEST_EMAIL="test+chain@deine-domain.de"           # test+ empfohlen; andere Adressen über ALLOWED_TEST_EMAILS
 
 # Klassischer Einzel-Landing-Test (kein Vermittlungsflow): stattdessen
 # nur TEST_LANDING_ID setzen – wird dann als Source UND Target genutzt.
@@ -121,7 +121,7 @@ zurücksetzen, Log leeren) – damit ist der nächste Durchlauf sofort möglich.
 
 ## Sicherheits-Regeln
 
-- **`TEST_EMAIL` muss mit `test+` beginnen** – sonst bricht das Skript ab.
+- **`TEST_EMAIL` sollte mit `test+` beginnen** – sonst bricht das Skript ab. Ausnahmen können über `ALLOWED_TEST_EMAILS` freigegeben werden.
 - Alle SQL-Updates sind auf **genau eine** `applications`-Row per E-Mail gescoped.
 - Preview-Endpoint: nur Service-Role.
 - Nach dem Test: Cleanup ausführen oder Test-Bewerber löschen.
