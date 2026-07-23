@@ -11,8 +11,8 @@ UPDATE auth.users
        created_at = now() - interval '2 days'
  WHERE email = :'test_email';
 
-DELETE FROM application_reminder_log
- WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email')
-   AND reminder_kind = 'reminder_complete_registration';
+DELETE FROM reminder_log
+ WHERE email = :'test_email'
+   AND reminder_type IN ('confirm_email', 'complete_registration');
 
 COMMIT;
