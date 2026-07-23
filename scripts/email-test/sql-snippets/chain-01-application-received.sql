@@ -34,14 +34,16 @@ INSERT INTO applications (
   email, first_name, last_name, full_name, tenant_id,
   broker_tenant_id, fasttrack_tenant_id,
   source_landing_id, target_landing_id, status, flow_type,
-  booking_status, created_at, updated_at
+  booking_status, magic_token, magic_token_expires_at,
+  created_at, updated_at
 )
 VALUES (
   :'test_email', 'Test', 'Kette', 'Test Kette', :'tenant_id'::uuid,
   (SELECT tenant_id FROM landing_pages WHERE id = :'source_landing_id'::uuid),
   (SELECT tenant_id FROM landing_pages WHERE id = :'target_landing_id'::uuid),
   :'source_landing_id'::uuid, :'target_landing_id'::uuid, 'neu', 'broker',
-  'none', now(), now()
+  'none', encode(gen_random_bytes(24), 'hex'), now() + interval '30 days',
+  now(), now()
 );
 
 COMMIT;
