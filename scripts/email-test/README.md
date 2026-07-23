@@ -121,7 +121,7 @@ zurücksetzen, Log leeren) – damit ist der nächste Durchlauf sofort möglich.
 
 ## Sicherheits-Regeln
 
-- **`TEST_EMAIL` muss mit `test+` beginnen** – sonst bricht das Skript ab.
+- **`TEST_EMAIL` sollte mit `test+` beginnen** – sonst bricht das Skript ab. Ausnahmen können über `ALLOWED_TEST_EMAILS` freigegeben werden.
 - Alle SQL-Updates sind auf **genau eine** `applications`-Row per E-Mail gescoped.
 - Preview-Endpoint: nur Service-Role.
 - Nach dem Test: Cleanup ausführen oder Test-Bewerber löschen.
