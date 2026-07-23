@@ -57,10 +57,23 @@ psql_run() {
 invoke_fn() {
   local fn="$1"
   local body="${2:-{}}"
-  curl -sS -X POST "$SUPABASE_URL/functions/v1/$fn" \
+  curl -fsS -X POST "$SUPABASE_URL/functions/v1/$fn" \
     -H "Authorization: Bearer $SERVICE_ROLE" \
     -H "Content-Type: application/json" \
     -d "$body"
+}
+
+require_success_response() {
+  local out="$1"
+  if ! echo "$out" | jq -e . >/dev/null 2>&1; then
+    echo "   ❌ Ungültige Antwort: $out"
+    return 1
+  fi
+  if echo "$out" | jq -e '(.error? != null) or (.success? == false)' >/dev/null; then
+    echo "   ❌ Versand fehlgeschlagen: $out"
+    return 1
+  fi
+  echo "$out"
 }
 
 # Query EINEN Spaltenwert aus der DB (quiet).
@@ -137,19 +150,39 @@ load_app_context() {
   echo "   App-ID: $APP_ID | Tenant-Domain: $TENANT_DOMAIN"
 }
 
+preflight() {
+  echo "Vorabcheck: Datenbank, Tenant und Landing …"
+  psql_value "SELECT 1;" >/dev/null
+
+  local tenant_exists landing_exists
+  tenant_exists=$(psql_value "SELECT count(*) FROM tenants WHERE id = '$TEST_TENANT_ID';")
+  landing_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_LANDING_ID';")
+
+  if [[ "$tenant_exists" != "1" ]]; then
+    echo "FEHLER: TEST_TENANT_ID wurde nicht gefunden."
+    return 1
+  fi
+  if [[ "$landing_exists" != "1" ]]; then
+    echo "FEHLER: TEST_LANDING_ID wurde nicht gefunden."
+    return 1
+  fi
+  echo "Vorabcheck erfolgreich."
+}
+
 # ---------- Stufe 1: Bewerbung eingegangen ----------------------------------
 stage_application_received() {
   psql_run "$SNIP/chain-01-application-received.sql"
   load_app_context
   local link="https://portal.${TENANT_DOMAIN}/termin/buchen/${APP_ID}?ref=${APP_ID}"
-  invoke_fn send-invitation-email \
+  local out
+  out=$(invoke_fn send-invitation-email \
     "$(jq -nc \
         --arg to "$TEST_EMAIL" \
         --arg link "$link" \
         --arg tid "$TEST_TENANT_ID" \
         --arg appId "$APP_ID" \
-        '{to:$to, registrationLink:$link, tenantId:$tid, applicationId:$appId, firstName:"Test", lastName:"Kette", templateNameOverride:"application_received"}')" \
-    | jq -c '{status: (.status // "?"), error: (.error // null), success: (.success // null)}'
+        '{to:$to, registrationLink:$link, tenantId:$tid, applicationId:$appId, firstName:"Test", lastName:"Kette", templateNameOverride:"application_received"}')")
+  require_success_response "$out" | jq -c '{status: (.status // "?"), error: (.error // null), success: (.success // null)}'
 }
 
 # ---------- Stufe 2: Termin bestätigt ---------------------------------------
@@ -266,6 +299,8 @@ echo "Tenant:  $TEST_TENANT_ID"
 echo "Landing: $TEST_LANDING_ID"
 echo "Pause zwischen Mails: ${PAUSE_SECONDS}s   SKIP=$SKIP"
 echo "=========================================================================="
+
+preflight
 
 run_stage application_received          "Bewerbung eingegangen"            stage_application_received
 run_stage booking_confirmation          "Termin bestätigt"                 stage_booking_confirmation
