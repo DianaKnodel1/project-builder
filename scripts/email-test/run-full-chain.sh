@@ -24,7 +24,7 @@
 # =============================================================================
 set -euo pipefail
 
-SUITE_VERSION="2026-07-23.4"
+SUITE_VERSION="2026-07-23.5"
 
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
@@ -230,6 +230,16 @@ preflight() {
     echo "FEHLER: Veraltete SQL-Snippets gefunden (ON CONFLICT)."
     echo "Bitte den kompletten Ordner scripts/email-test/ erneut synchronisieren."
     grep -REn --include='chain-*.sql' '^[[:space:]]*ON[[:space:]]+CONFLICT' "$SNIP" || true
+    return 1
+  fi
+
+  # booking_status hat einen CHECK-Constraint: nur none/pending/scheduled/
+  # cancelled/no_show/completed sind erlaubt. Alte Snippets nutzten 'confirmed'
+  # oder 'accepted' und würden erst beim UPDATE scheitern.
+  if grep -REqs --include='chain-*.sql' "booking_status[[:space:]]*=[[:space:]]*'(confirmed|accepted)'" "$SNIP"; then
+    echo "FEHLER: Veraltete SQL-Snippets gefunden (booking_status confirmed/accepted)."
+    echo "Bitte den kompletten Ordner scripts/email-test/ erneut synchronisieren."
+    grep -REn --include='chain-*.sql' "booking_status[[:space:]]*=[[:space:]]*'(confirmed|accepted)'" "$SNIP" || true
     return 1
   fi
 
