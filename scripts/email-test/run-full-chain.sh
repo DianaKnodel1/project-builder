@@ -24,7 +24,7 @@
 # =============================================================================
 set -euo pipefail
 
-SUITE_VERSION="2026-07-23.3"
+SUITE_VERSION="2026-07-23.4"
 
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
