@@ -57,6 +57,8 @@ Damit wir Sie persönlich kennenlernen können, wählen Sie bitte jetzt Ihren Te
 Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
 {{booking_link}}
 
+Sollten Sie bereits einen Termin gebucht haben, müssen Sie nichts weiter tun.
+
 Herzliche Grüße
 {{sender_name}}`;
 
