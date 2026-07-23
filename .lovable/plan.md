@@ -1,34 +1,62 @@
-## Ziel
 
-Die in den letzten Tagen im Code gepflegten Vorlagen (`application_received` = „Bewerbung eingegangen" und `booking_confirmation` = „Terminbestätigung") sollen als **einheitliche Vorlage für alle Tenants** gelten. Personalisierung passiert weiterhin über Platzhalter (`{{tenant_name}}`, `{{first_name}}`, Logo, Buchungslink usw.) — aber Betreff/Body/Button werden nicht mehr aus tenant-spezifischen DB-Spalten überschrieben.
+# Übersicht: Alle E-Mails im Portal
 
-## Änderungen
+Kein Code-Change — reine Bestandsaufnahme, damit du entscheiden kannst, welche Mails du als nächstes anpassen willst.
 
-### 1. `supabase/functions/send-invitation-email/index.ts`
-Beim Zweig `templateNameOverride === "application_received"`:
-- `dbSubject / dbBody / dbButton` nicht mehr aus `tenant.application_received_*` lesen — auf `null` lassen.
-- Damit greift automatisch immer `DEFAULT_APPLICATION_RECEIVED_TEMPLATE` / `DEFAULT_APPLICATION_RECEIVED_SUBJECT` und der Default-Button „Jetzt Termin buchen".
-- Explizit übergebene Aufruf-Overrides (`subjectOverride`, `introOverride`, `buttonLabelOverride`) bleiben respektiert (die kommen aus dem Code, nicht aus der Tenant-Konfig).
+## A) Bewerber-Mails (automatisch, alle Tenants, zentrale Vorlage)
 
-### 2. `supabase/functions/send-booking-confirmation/index.ts`
-Im `renderEmail({...})`-Aufruf (Zeilen 313–321) und beim `button_label` in `vars` (Zeile 307):
-- `subject: DEFAULT_SUBJECT`
-- `body: DEFAULT_BODY`
-- `button_label: DEFAULT_BUTTON`
-- `tenant.booking_confirmation_*` nicht mehr auslesen.
+Diese sind die „neuen" zentralen Templates aus den letzten Tagen — pro Tenant nur personalisiert (Logo, Name, Recruiter), Text ist überall gleich.
 
-### 3. Tenant-Felder unangetastet lassen
-- Die DB-Spalten (`application_received_subject/body/button_label`, `booking_confirmation_subject/body/button`) bleiben bestehen — nichts wird migriert oder gelöscht, damit alte Daten nicht verloren gehen und ein späterer Rückbau möglich ist.
-- Nur die Code-Pfade lesen sie nicht mehr.
+| # | Mail | Trigger | Function | Kind |
+|---|---|---|---|---|
+| 1 | **Bewerbung eingegangen – nächster Schritt** (mit Buchungslink + „Sollten Sie bereits einen Termin gebucht haben…") | Bewerbung wird akzeptiert / Broker-Flow angenommen | `send-invitation-email` | `application_received` |
+| 2 | **Termin bestätigt** (mit .ics-Anhang, Recruiter-Karte) | Direkt nach Buchung eines Interview-Slots, Cron alle 2 Min | `send-booking-confirmation` | `booking_confirmation` |
+| 3 | **Interview-Einladung mit Magic-Link** (~30 Min vor Gespräch) | Cron alle 10 Min, Fenster now+25…+40 Min vor `scheduled_at` | `send-appointment-reminders` | `interview_invite_30min` |
 
-### 4. Was weiterhin per Tenant personalisiert bleibt
-- Tenant-Name, Logo (Broker-Flow-Priorität wie zuletzt gebaut), Absenderadresse/SMTP, Primärfarbe, Recruiter-Name/-Avatar, Buchungslink, Bewerbername — alles via Platzhalter/Brand-Objekt im Renderer.
+## B) Bewerber-Reminder (automatisch, Cron)
 
-## Nicht in Scope
-- Admin-UI „E-Mail-Vorlagen" für diese beiden Templates. (Falls du willst, entferne ich die Tabs später separat — für jetzt bleiben sie sichtbar, wirken aber nicht mehr auf den Versand.)
-- Welcome-Mail (`welcome_email_*`) bleibt weiterhin per Tenant überschreibbar.
+Nutzen ebenfalls zentrale Defaults, laufen still im Hintergrund.
 
-## Deployment
-```
-cd /opt/apps/portal && git pull && bash scripts/deploy-backend.sh
-```
+| # | Mail | Trigger | Function | Kind |
+|---|---|---|---|---|
+| 4 | **Kein Termin gebucht – 24h Erinnerung** | 24h nach Bewerbung ohne Buchung, Cron alle 30 Min | `send-application-reminders` | `no_booking_24h` |
+| 5 | **Kein Termin gebucht – 72h Erinnerung** | 72h nach Bewerbung ohne Buchung | `send-application-reminders` | `no_booking_72h` |
+| 6 | **No-Show – erneut buchen** | 24h nach verpasstem Termin | `send-application-reminders` | `no_show_24h` |
+| 7 | **Rebook nach Absage** | Kandidat hat Termin gecancelt | send-application-reminders (rebook path) | `rebook_after_cancel` |
+
+## C) Onboarding / Account-Mails (Mitarbeiter nach Zusage)
+
+Tenant-SMTP, personalisierte Templates aus `tenants.*_body`.
+
+| # | Mail | Trigger | Function |
+|---|---|---|---|
+| 8 | **Willkommen / Registrierungs-Einladung** (Konto anlegen) | Admin akzeptiert Bewerbung mit Zusage | `send-invitation-email` (welcome branch) |
+| 9 | **E-Mail-Bestätigung** (Signup-Confirmation) | User legt Konto an | `send-signup-confirmation` |
+| 10 | **E-Mail-Bestätigung erneut senden** | Manuell / Reminder-Queue | `resend-signup-confirmation` |
+| 11 | **Passwort zurücksetzen** | User klickt „Passwort vergessen" | `send-password-reset` |
+
+## D) Drip-/Reminder-Serien für neue Mitarbeiter
+
+Cron 1× täglich, max. 5 Versuche, min. 3 Tage Abstand.
+
+| # | Mail | Zielgruppe | Function |
+|---|---|---|---|
+| 12 | **Einladung noch offen** | Angenommen, aber Konto nicht angelegt | `send-reminders` (`invite`) |
+| 13 | **E-Mail noch nicht bestätigt** | Konto angelegt, Bestätigung offen | `send-reminders` (`confirm_email`) |
+| 14 | **Registrierung abschließen** | Bestätigt, Onboarding unvollständig | `send-reminders` (`complete_registration`) |
+| 15 | **Invite-Drip-Queue** (verteilt Send-Bursts über den Tag) | Wrapper für #8/#12 | `process-invite-resend-queue` |
+
+## E) Interne / Manuelle Mails
+
+| # | Mail | Trigger | Function |
+|---|---|---|---|
+| 16 | **Chat-Erinnerung** („Du hast eine neue Nachricht von …") | Admin/Teamleiter klickt „📨 Erinnerung senden" | `send-chat-reminder` |
+| 17 | **SMTP-Test** (Diagnose, kein produktiver Versand) | Admin-Panel „SMTP testen" | `smtp-test` |
+
+## Was du daraus mitnehmen kannst
+
+- **Zentrale Vorlagen (A + B)**: Text ändern → Code-Default anfassen, gilt sofort für alle Tenants.
+- **Tenant-Vorlagen (C)**: Text ändern → im Admin-Panel unter E-Mail-Vorlagen pro Tenant, ODER Default im Code anfassen (dann nur für Tenants ohne Override).
+- **Cron-Übersicht**: 2 Min = booking_confirmation, 10 Min = interview_invite_30min, 15 Min = invite-drip-queue, 30 Min = application-reminders, 1×/Tag = send-reminders.
+
+Sag mir welche Mail du dir als nächstes vornehmen willst (Inhalt anpassen, Design, neuen Trigger, etc.), dann plane ich die konkrete Änderung.
