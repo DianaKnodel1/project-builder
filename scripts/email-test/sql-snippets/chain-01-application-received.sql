@@ -20,7 +20,10 @@ WHERE application_id IN (
   SELECT id FROM applications WHERE email = :'test_email'
 );
 
--- Bewerber upsert. tenant_id = Broker-/Source-Tenant, source_landing_id = Vermittlung,
+-- Alte Bewerbungen dieses Test-Users vollständig entfernen (kein unique constraint auf email vorhanden).
+DELETE FROM applications WHERE email = :'test_email';
+
+-- Bewerber neu anlegen. tenant_id = Broker-/Source-Tenant, source_landing_id = Vermittlung,
 -- target_landing_id = Fast-Track. Der DB-Trigger füllt daraus broker_tenant_id
 -- und fasttrack_tenant_id automatisch.
 INSERT INTO applications (
@@ -32,17 +35,7 @@ VALUES (
   :'test_email', 'Test', 'Kette', 'Test Kette', :'tenant_id'::uuid,
   :'source_landing_id'::uuid, :'target_landing_id'::uuid, 'neu', 'broker',
   NULL, now(), now()
-)
-ON CONFLICT (email) DO UPDATE
-  SET tenant_id = EXCLUDED.tenant_id,
-      source_landing_id = EXCLUDED.source_landing_id,
-      target_landing_id = EXCLUDED.target_landing_id,
-      status = EXCLUDED.status,
-      flow_type = EXCLUDED.flow_type,
-      booking_status = NULL,
-      scheduled_at = NULL,
-      created_at = now(),
-      updated_at = now();
+);
 
 COMMIT;
 
