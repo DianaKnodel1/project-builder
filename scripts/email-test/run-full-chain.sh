@@ -156,7 +156,7 @@ preflight() {
 
   local tenant_exists landing_exists
   tenant_exists=$(psql_value "SELECT count(*) FROM tenants WHERE id = '$TEST_TENANT_ID';")
-  landing_exists=$(psql_value "SELECT count(*) FROM landings WHERE id = '$TEST_LANDING_ID';")
+  landing_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_LANDING_ID';")
 
   if [[ "$tenant_exists" != "1" ]]; then
     echo "FEHLER: TEST_TENANT_ID wurde nicht gefunden."
