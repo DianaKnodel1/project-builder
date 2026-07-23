@@ -195,6 +195,21 @@ preflight() {
 
   local application_received_snippet="$SNIP/chain-01-application-received.sql"
 
+  local missing_commands=()
+  local command_name
+  for command_name in jq curl psql; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      missing_commands+=("$command_name")
+    fi
+  done
+  if (( ${#missing_commands[@]} > 0 )); then
+    echo "FEHLER: Benötigte Programme fehlen: ${missing_commands[*]}"
+    echo "Auf Ubuntu/Debian installieren mit:"
+    echo "  apt-get update && apt-get install -y ${missing_commands[*]}"
+    echo "Es wurden noch keine Testdaten verändert und keine Mail versendet."
+    return 1
+  fi
+
   # Der Runner und alle SQL-Snippets müssen immer als kompletter Ordner
   # synchronisiert werden. Alte Snippets verwendeten ON CONFLICT auf Spalten
   # ohne Unique-Constraint und dürfen nicht mehr ausgeführt werden.
