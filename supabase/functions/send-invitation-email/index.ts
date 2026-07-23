@@ -313,18 +313,24 @@ serve(async (req) => {
     }
 
     const isBrokerFlow = typeof routingKind === "string" && routingKind.startsWith("broker_");
-    if (tenant.logo_url && !/^https:\/\//i.test(String(tenant.logo_url).trim())) {
-      console.warn("[send-invitation-email] tenant.logo_url ist nicht absolut https:// — Wortmarke wird verwendet, sofern kein Landing-Logo greift", { tenant_id: tenant.id, logo_url: tenant.logo_url });
+    const tenantLogoAbsolute = tenant.logo_url && /^https:\/\//i.test(String(tenant.logo_url).trim())
+      ? tenant.logo_url
+      : null;
+    if (tenant.logo_url && !tenantLogoAbsolute) {
+      console.warn("[send-invitation-email] tenant.logo_url ist nicht absolut https:// — wird übersprungen", { tenant_id: tenant.id, logo_url: tenant.logo_url });
     }
+    // Broker-Flow (inkl. application_received): Source-Landing zuerst — sie hostet das Logo
+    // garantiert öffentlich. tenant.logo_url zeigt oft auf nicht-öffentliche Storage-URLs
+    // → kaputtes Bild-Icon im Mail-Client.
     const logoCandidates = isBrokerFlow
       ? [
-          { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
           { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
+          { source: "tenant.logo_url", url: tenantLogoAbsolute, domain: tenant.primary_domain || tenant.domain },
           { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
           { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
         ]
       : [
-          { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
+          { source: "tenant.logo_url", url: tenantLogoAbsolute, domain: tenant.primary_domain || tenant.domain },
           { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
           { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
           { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },

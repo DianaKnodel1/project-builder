@@ -58,14 +58,17 @@ function portalHost(domain: unknown): string {
 }
 
 function resolveBookingLogo(tenant: TenantRow, sourceLanding: any, targetLanding: any, fastTrackLanding: any): LogoResolution {
-  // Broker-Flow: Bewerber kennt die Vermittler-Marke von der Source-Landing —
-  // deshalb Broker-Tenant → Source-Landing (Broker) VOR Fast-Track/Target (Zielarbeitgeber).
-  if (tenant.logo_url && !/^https:\/\//i.test(String(tenant.logo_url).trim())) {
-    console.warn("[send-booking-confirmation] tenant.logo_url ist nicht absolut https:// — Fallback auf Landing-Logo/Wortmarke", { tenant_id: tenant.id, logo_url: tenant.logo_url });
+  // Source-Landing zuerst: sie hostet das Logo garantiert öffentlich (Bewerber hat sie eben gesehen).
+  // tenant.logo_url danach — und NUR wenn absolut https://, sonst zeigt der Mail-Client das kaputte Bild-Icon.
+  const tenantLogoAbsolute = tenant.logo_url && /^https:\/\//i.test(String(tenant.logo_url).trim())
+    ? tenant.logo_url
+    : null;
+  if (tenant.logo_url && !tenantLogoAbsolute) {
+    console.warn("[send-booking-confirmation] tenant.logo_url ist nicht absolut https:// — wird übersprungen", { tenant_id: tenant.id, logo_url: tenant.logo_url });
   }
   return resolveEmailLogo([
-    { source: "tenant.logo_url", url: tenant.logo_url, domain: tenant.primary_domain || tenant.domain },
     { source: "source_landing.logo", url: pickLandingLogo(sourceLanding), domain: sourceLanding?.domain },
+    { source: "tenant.logo_url", url: tenantLogoAbsolute, domain: tenant.primary_domain || tenant.domain },
     { source: "fasttrack_landing.logo", url: pickLandingLogo(fastTrackLanding), domain: fastTrackLanding?.domain },
     { source: "target_landing.logo", url: pickLandingLogo(targetLanding), domain: targetLanding?.domain },
   ]);
