@@ -1,20 +1,18 @@
 ## Ziel
-Stufe 1 der Test-Kette (`chain-01-application-received.sql`) läuft ohne NOT-NULL-Fehler.
+Den wiederholten Fehler zuverlässig beenden. Der Backend-Server führt weiterhin einen älteren Stand des SQL-Snippets aus: Im aktuellen Projekt setzt der Insert `booking_status` bereits ausdrücklich auf `'none'`, während die ausgeführte Version weiterhin `NULL` einfügt.
 
-## Ursache
-`applications.booking_status` ist `text NOT NULL DEFAULT 'none'` (Migration `20260618100000_calendly_integration.sql`, CHECK: `none, pending, scheduled, cancelled, no_show, completed`). Das Snippet schreibt aktuell explizit `NULL` in diese Spalte → Insert bricht ab.
+## Umsetzung
+1. **Suite-Version erhöhen**
+   - `SUITE_VERSION` auf eine neue Version setzen, damit in der Konsolenausgabe sofort erkennbar ist, ob wirklich der aktuelle Stand läuft.
 
-## Fix
-In `scripts/email-test/sql-snippets/chain-01-application-received.sql`:
-- Im `INSERT` den Wert für `booking_status` von `NULL` auf `'none'` ändern (der DB-Default für einen frischen Bewerber "vor Buchung").
-- Rest des Snippets bleibt unverändert.
+2. **Preflight gegen veraltete Dateien absichern**
+   - Vor dem ersten Test prüfen, dass `chain-01-application-received.sql` die Spalte `booking_status` und den Wert `'none'` enthält.
+   - Bei einem alten oder unvollständig synchronisierten Snippet mit einer klaren Meldung abbrechen, bevor Daten verändert werden.
 
-## Danach
-Auf dem Frontend-Server (124) den bestehenden Sync-Befehl erneut ausführen:
-```
-cd /opt/apps/portal && git pull
-tar -czf /tmp/email-test-suite.tgz -C scripts email-test
-scp /tmp/email-test-suite.tgz root@190.97.167.123:/tmp/
-ssh root@190.97.167.123 'rm -rf /opt/apps/portal-migrations/scripts/email-test && mkdir -p /opt/apps/portal-migrations/scripts && tar -xzf /tmp/email-test-suite.tgz -C /opt/apps/portal-migrations/scripts'
-```
-Anschließend auf Backend (123) den bekannten Export- und Testblock erneut starten.
+3. **Aktuelles SQL beibehalten**
+   - Der Test-Insert setzt `booking_status = 'none'`, passend zum bestätigten `NOT NULL`-Constraint und den erlaubten Statuswerten.
+
+4. **Einmal vollständig synchronisieren und prüfen**
+   - Den gesamten Ordner `scripts/email-test` erneut vom Frontend auf das Backend übertragen.
+   - Auf dem Backend vor dem Start die neue Suite-Version und die relevante SQL-Zeile anzeigen.
+   - Anschließend den bekannten Export- und Testblock ausführen.
