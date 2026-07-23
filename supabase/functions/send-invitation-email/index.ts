@@ -229,11 +229,12 @@ serve(async (req) => {
       dbBody = tenant.welcome_email_body || null;
     }
     if (templateNameOverride === "application_received") {
-      dbSubject = tenant.application_received_subject || null;
-      dbBody = tenant.application_received_body || null;
-      dbButton = tenant.application_received_button_label || null;
-      if (dbBody && isLegacyWelcomeTemplate(dbBody)) dbBody = null;
-      if (dbSubject && isLegacyWelcomeTemplate(dbSubject)) dbSubject = null;
+      // Zentrale Default-Vorlage für alle Tenants — per-Tenant DB-Overrides
+      // (application_received_subject/body/button_label) werden bewusst ignoriert.
+      // Personalisierung läuft weiter über Platzhalter (Tenant-Name, Logo, Link, ...).
+      dbSubject = null;
+      dbBody = null;
+      dbButton = null;
     }
 
     const isDefaultInvitation = !templateNameOverride || templateNameOverride === "invitation" || templateNameOverride === "ai_acceptance_invitation";
