@@ -41,7 +41,7 @@ VALUES (
   (SELECT tenant_id FROM landing_pages WHERE id = :'source_landing_id'::uuid),
   (SELECT tenant_id FROM landing_pages WHERE id = :'target_landing_id'::uuid),
   :'source_landing_id'::uuid, :'target_landing_id'::uuid, 'neu', 'broker',
-  NULL, now(), now()
+  'none', now(), now()
 );
 
 COMMIT;
