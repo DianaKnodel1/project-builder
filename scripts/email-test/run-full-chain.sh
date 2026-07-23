@@ -44,9 +44,14 @@ SKIP="${SKIP:-}"
 FORCE_SEND="${FORCE_SEND:-false}"
 
 # ---------- Sicherheits-Guard ------------------------------------------------
-if [[ "$TEST_EMAIL" != test+*@* ]]; then
-  echo "FEHLER: TEST_EMAIL muss mit 'test+' beginnen (z.B. test+gfndfghrzbg@outlook.com)."
+# Standard: nur test+Alias-Adressen, damit nie versehentlich echte Bewerber-
+# Adressen getriggert werden. Explizit freigegebene Einzeladressen können in
+# ALLOWED_TEST_EMAILS ergänzt werden (Leerzeichen-separiert).
+ALLOWED_TEST_EMAILS="${ALLOWED_TEST_EMAILS:-jessikasemen@outlook.com}"
+if [[ "$TEST_EMAIL" != test+*@* ]] && [[ " $ALLOWED_TEST_EMAILS " != *" $TEST_EMAIL "* ]]; then
+  echo "FEHLER: TEST_EMAIL muss mit 'test+' beginnen oder in ALLOWED_TEST_EMAILS stehen."
   echo "Aktuell: $TEST_EMAIL"
+  echo "Erlaubte Einzeladressen: $ALLOWED_TEST_EMAILS"
   exit 1
 fi
 
