@@ -304,15 +304,15 @@ serve(async (req) => {
         cancel_url: cancelUrl,
         // Portal-URL: Fast-Track-Portal (portal.<fast-track-domain>), dort läuft das KI-Interview.
         portal_url: fastTrackHost ? `https://${fastTrackHost}` : "",
-        button_label: tenant.booking_confirmation_button || DEFAULT_BUTTON,
+        button_label: DEFAULT_BUTTON,
       };
 
       const logo = resolveBookingLogo(tenant, sourceLanding, targetLanding, fastTrackLanding);
       const logoMetadata = { email_logo_url: logo.url, email_logo_source: logo.source, email_logo_reason: logo.reason, email_logo_candidates: logo.candidates };
 
       const { html, text, subject } = renderEmail({
-        subject: tenant.booking_confirmation_subject || DEFAULT_SUBJECT,
-        body: tenant.booking_confirmation_body || DEFAULT_BODY,
+        subject: DEFAULT_SUBJECT,
+        body: DEFAULT_BODY,
         preheader: DEFAULT_PREHEADER,
         spamHint: true,
         tenant: { ...tenant, logo_url: logo.url },
