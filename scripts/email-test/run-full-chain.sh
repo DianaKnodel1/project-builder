@@ -28,8 +28,16 @@ set -euo pipefail
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
 : "${DATABASE_URL:?set DATABASE_URL}"
 : "${TEST_TENANT_ID:?set TEST_TENANT_ID}"
-: "${TEST_LANDING_ID:?set TEST_LANDING_ID}"
 : "${TEST_EMAIL:?set TEST_EMAIL}"
+
+# Broker/Fast-Track-Test: TEST_SOURCE_LANDING_ID = Vermittlung, TEST_TARGET_LANDING_ID = Fast-Track.
+# Für den klassischen Einzel-Landing-Test reicht TEST_LANDING_ID (wird für beide verwendet).
+TEST_SOURCE_LANDING_ID="${TEST_SOURCE_LANDING_ID:-${TEST_LANDING_ID:-}}"
+TEST_TARGET_LANDING_ID="${TEST_TARGET_LANDING_ID:-${TEST_LANDING_ID:-$TEST_SOURCE_LANDING_ID}}"
+: "${TEST_SOURCE_LANDING_ID:?set TEST_SOURCE_LANDING_ID (Broker/Vermittlung) oder TEST_LANDING_ID}"
+: "${TEST_TARGET_LANDING_ID:?set TEST_TARGET_LANDING_ID (Fast-Track/Ziel) oder TEST_LANDING_ID}"
+# Rückwärtskompat: TEST_LANDING_ID = Target (wird an SQL-Snippets als :landing_id gereicht)
+TEST_LANDING_ID="$TEST_TARGET_LANDING_ID"
 
 PAUSE_SECONDS="${PAUSE_SECONDS:-6}"
 SKIP="${SKIP:-}"
