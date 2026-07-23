@@ -89,7 +89,7 @@ invoke_cron_safely() {
   dryOut=$(invoke_fn "$fn" "$dryBody")
 
   local candidates
-  candidates=$(echo "$dryOut" | jq -r '[.results[]? | select(.to == '""$TEST_EMAIL""')] | length')
+  candidates=$(echo "$dryOut" | jq -r --arg email "$TEST_EMAIL" '[.results[]? | select(.to == $email)] | length')
   local total
   total=$(echo "$dryOut" | jq -r '(.results | length) // 0')
 
