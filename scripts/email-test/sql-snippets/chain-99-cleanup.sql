@@ -6,7 +6,6 @@ BEGIN;
 UPDATE applications
    SET created_at = now(),
        updated_at = now(),
-       accepted_at = NULL,
        booking_status = NULL,
        scheduled_at = NULL
  WHERE email = :'test_email';
@@ -26,5 +25,5 @@ DELETE FROM reminder_log
 
 COMMIT;
 
-SELECT 'cleanup done' AS status, email, booking_status, created_at, accepted_at
+SELECT 'cleanup done' AS status, email, booking_status, created_at
   FROM applications WHERE email = :'test_email';
