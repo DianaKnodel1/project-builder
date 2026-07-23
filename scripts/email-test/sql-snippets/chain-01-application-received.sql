@@ -23,16 +23,23 @@ WHERE application_id IN (
 -- Alte Bewerbungen dieses Test-Users vollständig entfernen (kein unique constraint auf email vorhanden).
 DELETE FROM applications WHERE email = :'test_email';
 
+-- Nur für diesen isolierten Test-Insert werden User-Trigger übersprungen. Auf älteren
+-- Installationen enthält ein Applications-Trigger noch ein ungültiges ON CONFLICT,
+-- das den Insert sonst abbricht. Die Routing-Tenants setzen wir deshalb explizit.
+SET LOCAL session_replication_role = replica;
+
 -- Bewerber neu anlegen. tenant_id = Broker-/Source-Tenant, source_landing_id = Vermittlung,
--- target_landing_id = Fast-Track. Der DB-Trigger füllt daraus broker_tenant_id
--- und fasttrack_tenant_id automatisch.
+-- target_landing_id = Fast-Track. Routing-Tenants werden direkt aus den Landings gelesen.
 INSERT INTO applications (
   email, first_name, last_name, full_name, tenant_id,
+  broker_tenant_id, fasttrack_tenant_id,
   source_landing_id, target_landing_id, status, flow_type,
   booking_status, created_at, updated_at
 )
 VALUES (
   :'test_email', 'Test', 'Kette', 'Test Kette', :'tenant_id'::uuid,
+  (SELECT tenant_id FROM landing_pages WHERE id = :'source_landing_id'::uuid),
+  (SELECT tenant_id FROM landing_pages WHERE id = :'target_landing_id'::uuid),
   :'source_landing_id'::uuid, :'target_landing_id'::uuid, 'neu', 'broker',
   NULL, now(), now()
 );
