@@ -9,10 +9,33 @@ ohne Wartezeit auf reale Trigger.
 export SUPABASE_URL="https://<PROJECT>.supabase.co"      # oder self-hosted URL
 export SERVICE_ROLE="<SERVICE_ROLE_KEY>"                 # aus /opt/apps/portal/.env
 export DATABASE_URL="postgresql://…"                     # nur für Stufe 4 + 5
-export TEST_TENANT_ID="<uuid>"                           # ein realer Tenant
-export TEST_LANDING_ID="<uuid>"                          # Landing mit Domain
+export TEST_TENANT_ID="<broker-tenant-uuid>"             # Tenant der Source-Landing (Vermittlung)
+export TEST_SOURCE_LANDING_ID="<uuid>"                   # Vermittlungs-Landing (flow_type='broker')
+export TEST_TARGET_LANDING_ID="<uuid>"                   # Fast-Track-/Ziel-Landing
 export TEST_EMAIL="test+chain@deine-domain.de"           # MUSS mit test+ beginnen
+
+# Klassischer Einzel-Landing-Test (kein Vermittlungsflow): stattdessen
+# nur TEST_LANDING_ID setzen – wird dann als Source UND Target genutzt.
+# export TEST_LANDING_ID="<uuid>"
 ```
+
+### Passende IDs für den Vermittlungs-Test finden
+
+```sql
+SELECT l.id, l.slug, l.domain, l.flow_type, l.tenant_id, t.name AS tenant_name
+FROM landing_pages l JOIN tenants t ON t.id = l.tenant_id
+WHERE l.flow_type IN ('broker','fast')
+ORDER BY l.flow_type, t.name;
+```
+
+Beispiel personalservice (Vermittlung) → bv-agentur (Fast-Track):
+
+```bash
+export TEST_TENANT_ID="<tenant_id der personalservice-Zeile>"
+export TEST_SOURCE_LANDING_ID="8d4a3aac-ad75-4083-a153-fe4c8960b61b"  # personalservice
+export TEST_TARGET_LANDING_ID="<id der bv-agentur-Zeile>"
+```
+
 
 ## Ebene 1 — Rendering-Preview (Sekunden, KEIN Versand)
 

@@ -29,8 +29,8 @@ SELECT a.tenant_id, a.id, s.id,
   JOIN availability_schedules s
     ON s.landing_page_id IN (
       SELECT id FROM landing_pages
-       WHERE id = :'landing_id'::uuid
-          OR id = (SELECT linked_fasttrack_landing_id FROM landing_pages WHERE id = :'landing_id'::uuid)
+       WHERE id = :'target_landing_id'::uuid
+          OR id = (SELECT linked_fasttrack_landing_id FROM landing_pages WHERE id = :'target_landing_id'::uuid)
     )
    AND s.active = true
  WHERE a.email = :'test_email'

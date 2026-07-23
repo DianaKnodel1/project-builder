@@ -28,8 +28,16 @@ set -euo pipefail
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
 : "${DATABASE_URL:?set DATABASE_URL}"
 : "${TEST_TENANT_ID:?set TEST_TENANT_ID}"
-: "${TEST_LANDING_ID:?set TEST_LANDING_ID}"
 : "${TEST_EMAIL:?set TEST_EMAIL}"
+
+# Broker/Fast-Track-Test: TEST_SOURCE_LANDING_ID = Vermittlung, TEST_TARGET_LANDING_ID = Fast-Track.
+# Für den klassischen Einzel-Landing-Test reicht TEST_LANDING_ID (wird für beide verwendet).
+TEST_SOURCE_LANDING_ID="${TEST_SOURCE_LANDING_ID:-${TEST_LANDING_ID:-}}"
+TEST_TARGET_LANDING_ID="${TEST_TARGET_LANDING_ID:-${TEST_LANDING_ID:-$TEST_SOURCE_LANDING_ID}}"
+: "${TEST_SOURCE_LANDING_ID:?set TEST_SOURCE_LANDING_ID (Broker/Vermittlung) oder TEST_LANDING_ID}"
+: "${TEST_TARGET_LANDING_ID:?set TEST_TARGET_LANDING_ID (Fast-Track/Ziel) oder TEST_LANDING_ID}"
+# Rückwärtskompat: TEST_LANDING_ID = Target (wird an SQL-Snippets als :landing_id gereicht)
+TEST_LANDING_ID="$TEST_TARGET_LANDING_ID"
 
 PAUSE_SECONDS="${PAUSE_SECONDS:-6}"
 SKIP="${SKIP:-}"
@@ -50,6 +58,8 @@ psql_run() {
     -v test_email="$TEST_EMAIL" \
     -v tenant_id="$TEST_TENANT_ID" \
     -v landing_id="$TEST_LANDING_ID" \
+    -v source_landing_id="$TEST_SOURCE_LANDING_ID" \
+    -v target_landing_id="$TEST_TARGET_LANDING_ID" \
     "$@" \
     -f "$file"
 }
@@ -156,30 +166,55 @@ TENANT_DOMAIN=""
 
 load_app_context() {
   APP_ID=$(psql_value "SELECT id FROM applications WHERE email = '$TEST_EMAIL' LIMIT 1;")
-  TENANT_DOMAIN=$(psql_value "SELECT COALESCE(primary_domain, domain) FROM tenants WHERE id = '$TEST_TENANT_ID' LIMIT 1;")
-  echo "   App-ID: $APP_ID | Tenant-Domain: $TENANT_DOMAIN"
+  # Domain-Priorität: Target-Landing (Fast-Track) → Source-Landing (Broker) → tenants.domain.
+  # tenants.primary_domain existiert je nach Migrationsstand nicht – deshalb dynamisch prüfen.
+  local has_primary
+  has_primary=$(psql_value "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='tenants' AND column_name='primary_domain';")
+  local tenant_dom
+  if [[ "$has_primary" == "1" ]]; then
+    tenant_dom=$(psql_value "SELECT COALESCE(primary_domain, domain) FROM tenants WHERE id = '$TEST_TENANT_ID' LIMIT 1;")
+  else
+    tenant_dom=$(psql_value "SELECT domain FROM tenants WHERE id = '$TEST_TENANT_ID' LIMIT 1;")
+  fi
+  local target_dom source_dom
+  target_dom=$(psql_value "SELECT domain FROM landing_pages WHERE id = '$TEST_TARGET_LANDING_ID' LIMIT 1;")
+  source_dom=$(psql_value "SELECT domain FROM landing_pages WHERE id = '$TEST_SOURCE_LANDING_ID' LIMIT 1;")
+  TENANT_DOMAIN="${target_dom:-${source_dom:-$tenant_dom}}"
+  echo "   App-ID: $APP_ID | Booking-Domain: $TENANT_DOMAIN"
 }
 
 preflight() {
-  echo "Vorabcheck: Datenbank, Tenant und Landing …"
+  echo "Vorabcheck: Datenbank, Tenants und Landings …"
   psql_value "SELECT 1;" >/dev/null
 
-  local tenant_exists landing_exists schedule_exists
+  local tenant_exists src_exists tgt_exists src_flow tgt_flow schedule_exists
   tenant_exists=$(psql_value "SELECT count(*) FROM tenants WHERE id = '$TEST_TENANT_ID';")
-  landing_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_LANDING_ID';")
-  schedule_exists=$(psql_value "SELECT count(*) FROM availability_schedules WHERE active = true AND landing_page_id IN (SELECT id FROM landing_pages WHERE id = '$TEST_LANDING_ID' OR id = (SELECT linked_fasttrack_landing_id FROM landing_pages WHERE id = '$TEST_LANDING_ID'));")
+  src_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_SOURCE_LANDING_ID';")
+  tgt_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_TARGET_LANDING_ID';")
+  src_flow=$(psql_value "SELECT COALESCE(flow_type,'') FROM landing_pages WHERE id = '$TEST_SOURCE_LANDING_ID';")
+  tgt_flow=$(psql_value "SELECT COALESCE(flow_type,'') FROM landing_pages WHERE id = '$TEST_TARGET_LANDING_ID';")
+  schedule_exists=$(psql_value "SELECT count(*) FROM availability_schedules WHERE active = true AND landing_page_id IN (SELECT id FROM landing_pages WHERE id = '$TEST_TARGET_LANDING_ID' OR id = (SELECT linked_fasttrack_landing_id FROM landing_pages WHERE id = '$TEST_TARGET_LANDING_ID'));")
 
   if [[ "$tenant_exists" != "1" ]]; then
     echo "FEHLER: TEST_TENANT_ID wurde nicht gefunden."
     return 1
   fi
-  if [[ "$landing_exists" != "1" ]]; then
-    echo "FEHLER: TEST_LANDING_ID wurde nicht gefunden."
+  if [[ "$src_exists" != "1" ]]; then
+    echo "FEHLER: TEST_SOURCE_LANDING_ID ($TEST_SOURCE_LANDING_ID) wurde nicht gefunden."
+    return 1
+  fi
+  if [[ "$tgt_exists" != "1" ]]; then
+    echo "FEHLER: TEST_TARGET_LANDING_ID ($TEST_TARGET_LANDING_ID) wurde nicht gefunden."
     return 1
   fi
   if [[ "$schedule_exists" == "0" ]]; then
-    echo "FEHLER: Für TEST_LANDING_ID existiert kein aktiver Verfügbarkeitskalender."
+    echo "FEHLER: Für TEST_TARGET_LANDING_ID existiert kein aktiver Verfügbarkeitskalender (auch nicht über linked_fasttrack_landing_id)."
     return 1
+  fi
+  echo "   Source-Landing: $TEST_SOURCE_LANDING_ID (flow=$src_flow)"
+  echo "   Target-Landing: $TEST_TARGET_LANDING_ID (flow=$tgt_flow)"
+  if [[ "$TEST_SOURCE_LANDING_ID" != "$TEST_TARGET_LANDING_ID" && "$src_flow" != "broker" ]]; then
+    echo "   ⚠️  Source-Landing hat flow_type='$src_flow' (erwartet: 'broker'). Test läuft trotzdem weiter."
   fi
   echo "Vorabcheck erfolgreich."
 }
@@ -314,8 +349,9 @@ stage_reminder_complete_registration() {
 # ============================================================================
 echo "=========================================================================="
 echo "E-Mail-Kette starten für: $TEST_EMAIL"
-echo "Tenant:  $TEST_TENANT_ID"
-echo "Landing: $TEST_LANDING_ID"
+echo "Tenant:  $TEST_TENANT_ID (Broker/Source-Tenant)"
+echo "Source:  $TEST_SOURCE_LANDING_ID (Vermittlung)"
+echo "Target:  $TEST_TARGET_LANDING_ID (Fast-Track / Ziel)"
 echo "Pause zwischen Mails: ${PAUSE_SECONDS}s   SKIP=$SKIP"
 echo "=========================================================================="
 
