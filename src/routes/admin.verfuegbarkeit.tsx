@@ -99,7 +99,7 @@ function AdminAvailabilityPage() {
                 slot_duration_minutes: 30,
                 buffer_before_minutes: 0,
                 buffer_after_minutes: 0,
-                min_notice_hours: 4,
+                min_notice_hours: 0,
                 max_days_ahead: 21,
                 active: true,
               })}
