@@ -11,7 +11,7 @@ UPDATE applications
 UPDATE interview_appointments
    SET starts_at = now() - interval '25 hours',
        ends_at = now() - interval '24 hours',
-       status = 'missed',
+       status = 'no_show',
        updated_at = now() - interval '25 hours'
  WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email');
 
