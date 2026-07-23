@@ -7,8 +7,8 @@ UPDATE applications
        updated_at = now() - interval '4 days'
  WHERE email = :'test_email';
 
-DELETE FROM application_reminder_log
- WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email')
-   AND reminder_kind = 'reminder_invite';
+DELETE FROM reminder_log
+ WHERE email = :'test_email'
+   AND reminder_type = 'invite';
 
 COMMIT;
