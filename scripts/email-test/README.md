@@ -79,6 +79,23 @@ mit echter State-Manipulation und echtem Cron-Aufruf.
 bash scripts/email-test/run-full-chain.sh
 ```
 
+### Self-hosted: Testsuite vollständig auf den Backend-Server kopieren
+
+Runner und SQL-Snippets bilden eine gemeinsame Version. Deshalb niemals nur
+eine einzelne Datei kopieren. Auf dem Frontend-Server ausführen:
+
+```bash
+cd /opt/apps/portal
+tar -czf /tmp/email-test-suite.tgz -C scripts email-test
+scp /tmp/email-test-suite.tgz root@190.97.167.123:/tmp/
+ssh root@190.97.167.123 \
+  'rm -rf /opt/apps/portal-migrations/scripts/email-test && mkdir -p /opt/apps/portal-migrations/scripts && tar -xzf /tmp/email-test-suite.tgz -C /opt/apps/portal-migrations/scripts'
+```
+
+Beim Start zeigt der Runner seine Suite-Version. Sein Vorabcheck stoppt vor
+dem ersten Versand, wenn alte `ON CONFLICT`-Snippets oder benötigte
+Datenbankfelder fehlen.
+
 Was das Skript macht (pro Stufe):
 
 1. Lädt `sql-snippets/chain-<n>-*.sql`, das per `psql` den Test-Bewerber in

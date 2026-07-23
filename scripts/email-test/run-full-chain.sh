@@ -24,6 +24,8 @@
 # =============================================================================
 set -euo pipefail
 
+SUITE_VERSION="2026-07-23.2"
+
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
 : "${DATABASE_URL:?set DATABASE_URL}"
@@ -189,10 +191,75 @@ load_app_context() {
 }
 
 preflight() {
-  echo "Vorabcheck: Datenbank, Tenants und Landings …"
+  echo "Vorabcheck: Suite, Datenbank, Schema, Tenants und Landings …"
+
+  # Der Runner und alle SQL-Snippets müssen immer als kompletter Ordner
+  # synchronisiert werden. Alte Snippets verwendeten ON CONFLICT auf Spalten
+  # ohne Unique-Constraint und dürfen nicht mehr ausgeführt werden.
+  if grep -REqs --include='chain-*.sql' '^[[:space:]]*ON[[:space:]]+CONFLICT' "$SNIP"; then
+    echo "FEHLER: Veraltete SQL-Snippets gefunden (ON CONFLICT)."
+    echo "Bitte den kompletten Ordner scripts/email-test/ erneut synchronisieren."
+    grep -REn --include='chain-*.sql' '^[[:space:]]*ON[[:space:]]+CONFLICT' "$SNIP" || true
+    return 1
+  fi
+
   psql_value "SELECT 1;" >/dev/null
 
-  local tenant_exists src_exists tgt_exists src_flow tgt_flow schedule_exists
+  local missing_schema tenant_exists src_exists tgt_exists src_flow tgt_flow schedule_exists
+  missing_schema=$(psql_value "
+    WITH required(table_schema, table_name, column_name) AS (
+      VALUES
+        ('public','applications','id'),
+        ('public','applications','email'),
+        ('public','applications','tenant_id'),
+        ('public','applications','broker_tenant_id'),
+        ('public','applications','fasttrack_tenant_id'),
+        ('public','applications','source_landing_id'),
+        ('public','applications','target_landing_id'),
+        ('public','applications','status'),
+        ('public','applications','flow_type'),
+        ('public','applications','booking_status'),
+        ('public','applications','scheduled_at'),
+        ('public','applications','created_at'),
+        ('public','applications','updated_at'),
+        ('public','application_reminder_log','application_id'),
+        ('public','application_reminder_log','reminder_kind'),
+        ('public','reminder_log','email'),
+        ('public','reminder_log','reminder_type'),
+        ('public','interview_appointments','application_id'),
+        ('public','interview_appointments','schedule_id'),
+        ('public','interview_appointments','starts_at'),
+        ('public','interview_appointments','ends_at'),
+        ('public','interview_appointments','status'),
+        ('public','availability_schedules','id'),
+        ('public','availability_schedules','landing_page_id'),
+        ('public','availability_schedules','active'),
+        ('public','landing_pages','id'),
+        ('public','landing_pages','domain'),
+        ('public','landing_pages','flow_type'),
+        ('public','landing_pages','linked_fasttrack_landing_id'),
+        ('public','tenants','id'),
+        ('public','tenants','domain'),
+        ('auth','users','email'),
+        ('auth','users','email_confirmed_at'),
+        ('auth','users','confirmed_at'),
+        ('auth','users','created_at')
+    )
+    SELECT COALESCE(string_agg(r.table_schema || '.' || r.table_name || '.' || r.column_name, ', '), '')
+      FROM required r
+      LEFT JOIN information_schema.columns c
+        ON c.table_schema = r.table_schema
+       AND c.table_name = r.table_name
+       AND c.column_name = r.column_name
+     WHERE c.column_name IS NULL;")
+
+  if [[ -n "$missing_schema" ]]; then
+    echo "FEHLER: Der Datenbank fehlen für diese Tests benötigte Felder:"
+    echo "   $missing_schema"
+    echo "Bitte zuerst die fehlenden Migrationen einspielen; es wurde noch keine Mail versendet."
+    return 1
+  fi
+
   tenant_exists=$(psql_value "SELECT count(*) FROM tenants WHERE id = '$TEST_TENANT_ID';")
   src_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_SOURCE_LANDING_ID';")
   tgt_exists=$(psql_value "SELECT count(*) FROM landing_pages WHERE id = '$TEST_TARGET_LANDING_ID';")
@@ -353,6 +420,7 @@ stage_reminder_complete_registration() {
 
 # ============================================================================
 echo "=========================================================================="
+echo "E-Mail-Test-Suite: $SUITE_VERSION"
 echo "E-Mail-Kette starten für: $TEST_EMAIL"
 echo "Tenant:  $TEST_TENANT_ID (Broker/Source-Tenant)"
 echo "Source:  $TEST_SOURCE_LANDING_ID (Vermittlung)"

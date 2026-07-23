@@ -27,12 +27,12 @@
 --   AND booking_status IS DISTINCT FROM 'confirmed';
 
 -- =====================================================================
--- #6 no_show_24h  →  interview_appointments in Vergangenheit + missed
+-- #6 no_show_24h  →  interview_appointments in Vergangenheit + no_show
 -- =====================================================================
 -- UPDATE interview_appointments
 --   SET starts_at = now() - interval '25 hours',
 --       ends_at   = now() - interval '24 hours',
---       status    = 'missed'
+--       status    = 'no_show'
 -- WHERE application_id = (SELECT id FROM applications WHERE email='test+noshow@deine-domain.de' LIMIT 1);
 
 -- =====================================================================
@@ -52,17 +52,17 @@
 -- WHERE application_id = (SELECT id FROM applications WHERE email='test+invite30@deine-domain.de' LIMIT 1);
 
 -- =====================================================================
--- #12 reminder invite (send-reminders)  →  Bewerbung angenommen aber kein Account
--- Setze applications.accepted_at auf -4d
+-- #13 reminder invite (send-reminders) → Bewerbung angenommen aber kein Account
+-- Der aktuelle Versand nutzt status='akzeptiert' und created_at als Zeitbasis.
 -- =====================================================================
 -- UPDATE applications
---   SET accepted_at = now() - interval '4 days'
+--   SET status = 'akzeptiert', created_at = now() - interval '4 days'
 -- WHERE email = 'test+invitedrip@deine-domain.de';
 
 -- =====================================================================
 -- Cleanup: Zeiten wieder auf jetzt zurücksetzen (Test beenden)
 -- =====================================================================
--- UPDATE applications SET created_at = now(), accepted_at = NULL
+-- UPDATE applications SET created_at = now()
 -- WHERE email LIKE 'test+%@deine-domain.de';
 --
 -- UPDATE interview_appointments SET starts_at = now() + interval '2 days',
