@@ -22,10 +22,13 @@ DELETE FROM application_reminder_log
  WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email')
    AND reminder_kind = 'rebook_after_cancel_72h';
 
--- Muss die letzte schreibende Operation sein: Termin-/Log-Trigger können den
--- Zeitstempel zuvor wieder auf jetzt setzen.
+-- Die produktive DB hat einen BEFORE-UPDATE-Trigger, der updated_at immer auf
+-- now() setzt. Für diesen isolierten Test den Trigger nur für dieses UPDATE
+-- deaktivieren; nach der Anweisung wird er sofort wieder aktiviert.
+ALTER TABLE applications DISABLE TRIGGER USER;
 UPDATE applications
    SET updated_at = now() - interval '73 hours'
  WHERE email = :'test_email';
+ALTER TABLE applications ENABLE TRIGGER USER;
 
 COMMIT;
