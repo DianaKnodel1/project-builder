@@ -24,7 +24,7 @@
 # =============================================================================
 set -euo pipefail
 
-SUITE_VERSION="2026-07-24.3"
+SUITE_VERSION="2026-07-24.4"
 
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
@@ -481,16 +481,25 @@ stage_reminder_invite() {
   psql_run "$SNIP/chain-13-reminder-invite.sql" || return 1
   local out
   out=$(invoke_fn send-reminders \
-    "$(jq -nc '{dry_run:true, only_type:"invite", ignore_quiet_hours:true}')")
+    "$(jq -nc --arg email "$TEST_EMAIL" '{dry_run:true, only_type:"invite", only_email:$email, ignore_quiet_hours:true}')") || return 1
+  require_success_response "$out" >/dev/null || return 1
   echo "$out" | jq -c '{by_type, skipped: .skipped, sent: .sent}'
 }
 
 # ---------- Stufe 14: Registrierung abschließen (Drip) ----------------------
 stage_reminder_complete_registration() {
   psql_run "$SNIP/chain-14-reminder-complete-registration.sql" || return 1
-  invoke_fn send-reminders \
-    "$(jq -nc '{dry_run:false, only_type:"confirm_email", ignore_quiet_hours:true}')" \
-    | jq -c '{by_type, skipped: .skipped, sent: .sent}'
+  local out sent failed
+  out=$(invoke_fn send-reminders \
+    "$(jq -nc --arg email "$TEST_EMAIL" '{dry_run:false, only_type:"confirm_email", only_email:$email, ignore_quiet_hours:true}')") || return 1
+  require_success_response "$out" >/dev/null || return 1
+  sent=$(echo "$out" | jq -r '.sent // 0')
+  failed=$(echo "$out" | jq -r '.failed // 0')
+  if [[ "$sent" != "1" || "$failed" != "0" ]]; then
+    echo "   ❌ Registrierungsmail nicht eindeutig erfolgreich: $out"
+    return 1
+  fi
+  echo "$out" | jq -c '{by_type, skipped: .skipped, sent: .sent}'
 }
 
 # ============================================================================
