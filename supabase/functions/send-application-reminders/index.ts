@@ -543,8 +543,8 @@ serve(async (req) => {
     // Pro Tenant/Sender bewusst konservativ: einige Mailserver blocken schon
     // nach wenigen Mails pro Stunde mit "too many messages from sender".
     const MAX_PER_RUN_PER_TENANT = 5;
-    const MAX_PER_1H_PER_TENANT = 8;
-    const MAX_PER_12H_PER_TENANT = 80;
+    const MAX_PER_1H_PER_TENANT = 50;
+    const MAX_PER_12H_PER_TENANT = 300;
     const JITTER_MIN_MS = 400;
     const JITTER_MAX_MS = 1200;
     const AUTO_PAUSE_AFTER_FAILS = 3;
