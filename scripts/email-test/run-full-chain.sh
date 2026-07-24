@@ -134,14 +134,24 @@ invoke_cron_safely() {
   require_success_response "$dryOut" >/dev/null || return 1
 
   local candidates
-  candidates=$(echo "$dryOut" | jq -r --arg email "$TEST_EMAIL" '[.results[]? | select(.to == $email)] | length')
+  candidates=$(echo "$dryOut" | jq -r --arg email "$TEST_EMAIL" --arg app "$APP_ID" '[.results[]? | select((.to == $email) or (.app == $app) or (.id == $app))] | length')
   local total
   total=$(echo "$dryOut" | jq -r '(.results | length) // 0')
+  local target_status target_reason
+  target_status=$(echo "$dryOut" | jq -r --arg email "$TEST_EMAIL" --arg app "$APP_ID" '[.results[]? | select((.to == $email) or (.app == $app) or (.id == $app))][0].status // "none"')
+  target_reason=$(echo "$dryOut" | jq -r --arg email "$TEST_EMAIL" --arg app "$APP_ID" '[.results[]? | select((.to == $email) or (.app == $app) or (.id == $app))][0].reason // "none"')
 
-  echo "   dry_run: candidates=$total, target=$candidates"
+  echo "   dry_run: candidates=$total, target=$candidates, status=$target_status, reason=$target_reason"
 
   if [[ "$candidates" != "1" || "$total" != "1" ]]; then
-    echo "   ❌ Abbruch: $fn würde $candidates Mal an $TEST_EMAIL und insgesamt $total Mal senden."
+    echo "   ❌ Abbruch: $fn würde $candidates Mal an $TEST_EMAIL / App $APP_ID und insgesamt $total Mal senden."
+    echo "   Ziel-Status: $target_status  Grund: $target_reason"
+    echo "   Output: $dryOut"
+    return 1
+  fi
+
+  if [[ "$target_status" != "would_send" ]]; then
+    echo "   ❌ Abbruch: Ziel-Kandidat hat Status '$target_status' (Grund: $target_reason), kein 'would_send'."
     echo "   Output: $dryOut"
     return 1
   fi
