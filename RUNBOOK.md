@@ -174,3 +174,40 @@ bash scripts/deploy-backend.sh             # dann echt deployen
 - Server-Ausfall (Portal- oder Backend-Host offline) → braucht zweiten Stack + Replikation, separater Plan.
 - Automatischer DNS-Failover (Cloudflare Load Balancer) → hilft nicht gegen Registrar-Sperre der Primärdomain.
 - Datenbank-Restore aus Backup → separater DR-Plan.
+
+---
+
+## E-Mail-Templates: DB-Overrides auf Default zurücksetzen
+
+Die aktuellen Body-/Subject-Defaults liegen in den Edge-Functions
+(`send-invitation-email`, `send-booking-confirmation`,
+`send-application-reminders`, `send-appointment-reminders`,
+`send-reminders`, `send-chat-reminder`). Sie werden nur verwendet, wenn die
+entsprechenden Tenant-Spalten `NULL` sind. Falls ein Tenant einen alten
+Override in der DB hat, überschreibt dieser den zentralen Default.
+
+Um bei einem Tenant zurück auf die zentralen Defaults zu fallen:
+
+```sql
+UPDATE tenants
+SET booking_confirmation_subject = NULL,
+    booking_confirmation_body    = NULL,
+    booking_confirmation_button  = NULL,
+    application_received_subject = NULL,
+    application_received_body    = NULL,
+    application_received_button_label = NULL,
+    bewerbung_magic_link_subject = NULL,
+    bewerbung_magic_link_body    = NULL,
+    bewerbung_magic_link_button  = NULL,
+    reminder_app_no_booking_subject = NULL, reminder_app_no_booking_body = NULL,
+    reminder_app_no_show_subject    = NULL, reminder_app_no_show_body    = NULL,
+    reminder_app_registration_subject = NULL, reminder_app_registration_body = NULL
+WHERE id = '<TENANT_ID>';
+```
+
+## SMTP-Kapazität pro Tenant
+
+- Sendefenster: **06:00–22:00 Europe/Berlin** (`send-reminders` Quiet-Hours).
+- Pro Tenant/Sender: **150 Mails/h**, **1 800 Mails/12 h** — enforced in
+  `send-application-reminders/index.ts`. Ändert der SMTP-Provider den
+  Vertrag, dort anpassen.

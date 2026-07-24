@@ -39,8 +39,8 @@ const NO_BOOKING_DAYS = 7;
 // Reminder-Mails werden nur tagsüber versendet, niemals nachts.
 // Standard: 08:00–20:00 lokal (Europe/Berlin). Außerhalb → kompletter Skip.
 // Über `ignore_quiet_hours: true` im Request-Body manuell erzwingbar (Admin-Trigger).
-const QUIET_HOURS_START = 8;  // inkl.
-const QUIET_HOURS_END = 20;   // exkl. (also bis 19:59)
+const QUIET_HOURS_START = 6;  // inkl. (Sendefenster startet 06:00 Europe/Berlin)
+const QUIET_HOURS_END = 22;   // exkl. (also bis 21:59 — SMTP-Vertrag 6–22 Uhr)
 function berlinHour(): number {
   const h = new Intl.DateTimeFormat("de-DE", {
     timeZone: "Europe/Berlin", hour: "2-digit", hour12: false,

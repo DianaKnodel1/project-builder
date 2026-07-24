@@ -540,11 +540,11 @@ serve(async (req) => {
     const results: any[] = [];
 
     // ─── Rate-Limits (SMTP-Reputationsschutz) ───
-    // Pro Tenant/Sender bewusst konservativ: einige Mailserver blocken schon
-    // nach wenigen Mails pro Stunde mit "too many messages from sender".
-    const MAX_PER_RUN_PER_TENANT = 5;
-    const MAX_PER_1H_PER_TENANT = 50;
-    const MAX_PER_12H_PER_TENANT = 300;
+    // Neuer SMTP-Vertrag: 150 Mails/h pro Tenant/Sender, Sendefenster 6–22 Uhr.
+    // 12h-Cap = 12 × 150 = 1800. Cron läuft alle 30 Min → RUN-Cap moderat auf 8.
+    const MAX_PER_RUN_PER_TENANT = 8;
+    const MAX_PER_1H_PER_TENANT = 150;
+    const MAX_PER_12H_PER_TENANT = 1800;
     const JITTER_MIN_MS = 400;
     const JITTER_MAX_MS = 1200;
     const AUTO_PAUSE_AFTER_FAILS = 3;

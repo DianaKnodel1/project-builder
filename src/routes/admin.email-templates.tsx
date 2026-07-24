@@ -24,55 +24,77 @@ import { SuppressedRecipientsPanel } from "@/components/admin/SuppressedRecipien
 import { RoutingAuditPanel } from "@/components/admin/RoutingAuditPanel";
 
 
-// Defaults für Reminder-Templates (gespiegelt zur Edge Function).
+// Defaults für Reminder-Templates — 1:1 gespiegelt zu den Edge-Function-Defaults.
+// Source of Truth ist der jeweilige Kommentar am Edge-Function-Konstantennamen.
 const REMINDER_DEFAULTS = {
+  // send-invitation-email → DEFAULT_WELCOME_TEMPLATE (Fast-Track Zusage)
   employee_signup: {
-    subject: "🎉 Willkommen im Team – Ihre Registrierung in 5 Min",
-    body: `Hallo {{first_name}},\n\nherzlichen Glückwunsch – Ihr Profil hat uns überzeugt! 🎉\n\nDamit Sie direkt starten können, ist nur noch ein Schritt nötig: die Registrierung im Mitarbeiter-Portal.\n\nWas Sie brauchen (bitte bereithalten):\n• Personalausweis oder Reisepass\n• IBAN (Bankverbindung für die Gehaltszahlung)\n• Steuer-Identifikationsnummer (11-stellig)\n• Sozialversicherungsnummer (falls vorhanden)\n\nWie geht es weiter?\n1. Portal-Registrierung abschließen (ca. 5 Minuten)\n2. Arbeitsvertrag digital unterschreiben\n3. Sofort loslegen – Aufträge stehen bereit\n\n{{cta:Jetzt registrieren|{{portal_link}}}}\n\nBei Fragen antworten Sie einfach auf diese E-Mail – wir helfen gerne.\n\nHerzliche Grüße\n{{sender_name}}`,
+    subject: "Willkommen im Team – Ihre Registrierung in 5 Minuten",
+    body: `Hallo {{first_name}},\n\nherzlichen Glückwunsch – Ihr Profil hat uns überzeugt.\n\nDamit Sie direkt starten können, ist nur noch ein Schritt nötig: die Registrierung im Mitarbeiter-Portal.\n\nWas Sie brauchen (bitte bereithalten):\n• Personalausweis oder Reisepass\n• IBAN (Bankverbindung für die Gehaltszahlung)\n• Steuer-Identifikationsnummer (11-stellig, steht auf Ihrem Lohnsteuerbescheid)\n• Sozialversicherungsnummer (falls vorhanden)\n\nWie geht es weiter?\n1. Portal-Registrierung abschließen (ca. 5 Minuten)\n2. Arbeitsvertrag digital unterschreiben\n3. Sofort loslegen – Aufträge stehen bereit\n\n{{cta:Jetzt registrieren|{{portal_link}}}}\n\nBei Fragen antworten Sie einfach auf diese E-Mail – wir helfen gerne.\n\nHerzliche Grüße\n{{sender_name}}`,
   },
+  // send-invitation-email → DEFAULT_APPLICATION_RECEIVED_TEMPLATE
+  application_received: {
+    subject: "Bewerbung eingegangen – nächster Schritt",
+    body: `Hallo {{first_name}},\n\nvielen Dank für Ihre Bewerbung bei {{tenant_name}}. Wir haben Ihre Angaben erhalten.\n\nDamit wir Sie persönlich kennenlernen können, wählen Sie bitte jetzt Ihren Termin für das Bewerbungsgespräch aus:\n\n{{cta:{{application_received_button_label}}|{{booking_link}}}}\n\nFalls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:\n{{booking_link}}\n\nSollten Sie bereits einen Termin gebucht haben, müssen Sie nichts weiter tun.\n\nHerzliche Grüße\n{{sender_name}}`,
+    button: "Jetzt Termin buchen",
+  },
+  // send-reminders → confirm-Reminder
   confirm: {
     subject: "Bitte bestätige deine E-Mail – {{tenant_name}}",
     body: `Wir haben deine Bestätigung für {{email}} noch nicht erhalten. Bitte bestätige deine E-Mail, damit du dich anmelden kannst.\n\n{{cta:E-Mail bestätigen|{{confirmation_link}}}}\n\nOder kopiere diesen Link: {{confirmation_link}}`,
   },
+  // send-reminders → completion-Reminder
   completion: {
     subject: "Bitte schließe deine Registrierung ab – {{tenant_name}}",
     body: `Hallo {{first_name}},\n\nin deinem Account bei {{tenant_name}} fehlen noch ein paar Angaben (z.B. Personalausweis, Arbeitsvertrag oder Pflichtdaten). Bitte melde dich an und vervollständige dein Profil.\n\n{{cta:Jetzt vervollständigen|{{login_link}}}}\n\nLogin: {{login_link}}`,
   },
+  // send-reminders → no_booking (Mitarbeiter, 7 Tage ohne Auftrag)
   no_booking: {
     subject: "Neue Aufträge warten auf dich – {{tenant_name}}",
     body: `Hallo {{first_name}},\n\ndu hast seit über 7 Tagen keine Aufträge mehr bei {{tenant_name}} gebucht. Im Portal warten freie Termine — sichere dir jetzt deinen nächsten Einsatz.\n\n{{cta:Aufträge ansehen|{{booking_link}}}}\n\nOder kopiere diesen Link: {{booking_link}}`,
   },
+  // send-reminders → recovery_mitarbeiter (Domain-Wechsel)
   recovery_mitarbeiter: {
     subject: "Wir sind umgezogen – dein neuer Portal-Link für {{tenant_name}}",
     body: `Hallo {{first_name}},\n\nwir haben eine neue Online-Adresse! Dein Mitarbeiter-Portal von {{tenant_name}} findest du ab sofort unter einer neuen URL.\n\nDeine Zugangsdaten bleiben unverändert – einfach mit der neuen Adresse einloggen, weitermachen mit Aufträgen, Onboarding-Schritten und Vertragsunterlagen wie gewohnt.\n\n{{cta:Zum neuen Portal|{{portal_link}}}}\n\nFalls der Button nicht funktioniert, kopiere diesen Link:\n{{portal_link}}\n\nViele Grüße\nDein {{tenant_name}}-Team`,
   },
+  // send-chat-reminder
   chat: {
     subject: "Neue Nachricht von {{team_leader_name}} – {{tenant_name}}",
     body: `Hi {{first_name}},\n\ndu hast {{unread_count}} ungelesene Nachricht(en) von {{team_leader_name}} im Mitarbeiter-Portal.\n\nBitte logge dich kurz ein und antworte – so geht's für dich am schnellsten weiter.\n\n{{cta:Jetzt einloggen|{{login_link}}}}\n\nFalls der Button nicht funktioniert: {{login_link}}`,
   },
+  // send-application-reminders → DEFAULTS.no_booking
   app_no_booking: {
     subject: "Erinnerung: Dein Termin bei {{tenant_name}} steht noch aus",
     body: `Hallo {{first_name}},\n\nvielen Dank für deine Bewerbung bei {{tenant_name}}. Damit wir dich kennenlernen können, fehlt nur noch dein Wunschtermin für das kurze Erstgespräch.\n\n{{cta:Jetzt Termin auswählen|{{calendly_link}}}}\n\nFalls der Button nicht funktioniert, kopiere diesen Link:\n{{calendly_link}}\n\nViele Grüße\n{{recruiter_name}}\n{{tenant_name}}`,
   },
+  // send-application-reminders → DEFAULTS.no_show
   app_no_show: {
     subject: "Schade, dass es nicht geklappt hat – buche einen neuen Termin",
     body: `Hallo {{first_name}},\n\nleider konnten wir dich zu deinem Termin am {{appointment_date}} um {{appointment_time}} Uhr nicht erreichen. Kein Problem – wir hätten dich gern trotzdem kennengelernt.\n\nBitte wähle einen neuen Wunschtermin, der besser passt:\n\n{{cta:Neuen Termin auswählen|{{calendly_link}}}}\n\nFalls du Fragen hast oder Unterstützung brauchst, antworte einfach auf diese E-Mail.\n\nViele Grüße\n{{recruiter_name}}\n{{tenant_name}}`,
   },
+  // send-application-reminders → DEFAULTS.registration
   app_registration: {
-    subject: "🎉 Ihr Portal-Zugang wartet – nur noch ein Klick, {{first_name}}",
-    body: `Hallo {{first_name}},\n\nherzlichen Glückwunsch nochmal zu Ihrer Zusage bei {{tenant_name}}! 🎊\n\nUns ist aufgefallen, dass Sie sich noch nicht im Mitarbeiter-Portal registriert haben. Erst mit der Registrierung können wir Ihren Arbeitsvertrag bereitstellen und Sie erhalten Zugriff auf Ihre ersten Aufträge.\n\nBitte bereithalten: Personalausweis, IBAN, Steuer-ID.\n\nDie Registrierung dauert nur ca. 5 Minuten:\n\n{{cta:Jetzt im Portal registrieren|{{portal_link}}}}\n\nFalls der Button nicht funktioniert, kopieren Sie diesen Link:\n{{portal_link}}\n\nBei Fragen antworten Sie einfach auf diese E-Mail – wir helfen gerne.\n\nHerzliche Grüße\n{{recruiter_name}}\n{{tenant_name}}`,
+    subject: "Ihr Portal-Zugang wartet – nur noch ein Klick, {{first_name}}",
+    body: `Hallo {{first_name}},\n\nherzlichen Glückwunsch nochmal zu Ihrer Zusage bei {{tenant_name}}.\n\nUns ist aufgefallen, dass Sie sich noch nicht im Mitarbeiter-Portal registriert haben. Erst mit der Registrierung können wir Ihren Arbeitsvertrag bereitstellen und Sie erhalten Zugriff auf Ihre ersten Aufträge.\n\nDie Registrierung dauert nur 2 Minuten:\n\n{{cta:Jetzt im Portal registrieren|{{portal_link}}}}\n\nFalls der Button nicht funktioniert, kopieren Sie diesen Link:\n{{portal_link}}\n\nBei Fragen antworten Sie einfach auf diese E-Mail – wir helfen gerne.\n\nHerzliche Grüße\n{{recruiter_name}}\n{{tenant_name}}`,
   },
+  // send-application-reminders → DEFAULTS.rebook (neuer Termin nach Cancel)
+  rebook_after_cancel: {
+    subject: "Ihr Termin wurde abgesagt – bitte wählen Sie einen neuen",
+    body: `Hallo {{first_name}},\n\nIhr geplanter Termin bei {{tenant_name}} wurde abgesagt. Wir würden Sie trotzdem sehr gerne kennenlernen und laden Sie ein, einen neuen Wunschtermin zu wählen.\n\n{{cta:Neuen Termin auswählen|{{calendly_link}}}}\n\nFalls der Button nicht funktioniert, kopieren Sie diesen Link:\n{{calendly_link}}\n\nBei Fragen antworten Sie einfach auf diese E-Mail – wir helfen gerne.\n\nHerzliche Grüße\n{{recruiter_name}}\n{{tenant_name}}`,
+  },
+  // send-appointment-reminders → DEFAULT_SUBJECT/BODY/BUTTON (30 Min vor Interview)
   bewerbung_magic_link: {
-    subject: "⏰ In 30 Minuten startet Ihr Bewerbungsgespräch – {{tenant_name}}",
-    body: `Guten Tag {{first_name}},\n\nkurze Erinnerung: In etwa 30 Minuten startet Ihr Bewerbungsgespräch.\n\nSo läuft es ab:\n\n1️⃣  Kurzes Video-/Chat-Gespräch (ca. 10–15 Min)\n2️⃣  Bei positiver Bewertung erhalten Sie direkt eine Zusage per E-Mail\n3️⃣  Anschließend Registrierung im Mitarbeiter-Portal – Vertrag digital unterschreiben und loslegen\n\nBitte starten Sie das Gespräch über diesen persönlichen Link:\n\n{{cta:Bewerbungsgespräch starten|{{portal_link}}}}\n\nTipp: Ruhige Umgebung, stabile Internet-Verbindung. Bei Problemen antworten Sie einfach auf diese E-Mail.\n\nViel Erfolg und bis gleich!\n{{recruiter_name}}\n{{tenant_name}}`,
+    subject: "In 30 Minuten startet Ihr Bewerbungsgespräch",
+    body: `Hallo {{first_name}},\n\nkurze Erinnerung: In etwa 30 Minuten ({{appointment_time}} Uhr) startet Ihr Bewerbungsgespräch.\n\nSo läuft es ab:\n\n1. Kurzes Gespräch (ca. 10–15 Min)\n2. Bei positiver Bewertung erhalten Sie direkt eine Zusage per E-Mail\n3. Anschließend Registrierung im Mitarbeiter-Portal – Vertrag digital unterschreiben und loslegen\n\nBitte starten Sie das Gespräch über Ihren persönlichen Link:\n\n{{cta:{{button_label}}|{{magic_link}}}}\n\nTipp: Ruhige Umgebung, stabile Internet-Verbindung. Bei Problemen einfach auf diese E-Mail antworten.\n\nViel Erfolg und bis gleich!\n{{tenant_name}}`,
     button: "Bewerbungsgespräch starten",
   },
+  // send-booking-confirmation → DEFAULT_SUBJECT/BODY/BUTTON
   booking_confirmation: {
-    subject: "✅ Termin bestätigt: {{appointment_date}}, {{appointment_time}} Uhr",
-    body: `Hallo {{first_name}},\n\nvielen Dank – Ihr Termin für das Bewerbungsgespräch bei {{tenant_name}} ist fest reserviert:\n\n📅  {{appointment_date}}\n🕐  {{appointment_time}} Uhr\n⏱️  Dauer: ca. {{duration_minutes}} Minuten\n\nSie finden den Termin als Kalendereintrag (.ics) im Anhang – einfach öffnen und in Outlook, Google oder Apple-Kalender speichern.\n\n30 Minuten vor Beginn schicken wir Ihnen zusätzlich den direkten Link zum Gespräch, damit Sie ihn nicht extra suchen müssen.\n\nSollten Sie den Termin verschieben oder absagen müssen, tun Sie das jederzeit hier:\n\n{{cta:Termin verwalten|{{cancel_url}}}}\n\nWir freuen uns auf das Gespräch!\n\nHerzliche Grüße\n{{recruiter_name}}`,
+    subject: "Termin bestätigt: {{appointment_date}}, {{appointment_time}} Uhr",
+    body: `Hallo {{first_name}},\n\nvielen Dank – Ihr Termin für das Bewerbungsgespräch bei {{tenant_name}} ist fest reserviert:\n\nDatum: {{appointment_date}}\nUhrzeit: {{appointment_time}} Uhr\nDauer: ca. {{duration_minutes}} Minuten\n\nSie finden den Termin als Kalendereintrag (.ics) im Anhang – einfach öffnen und in Outlook, Google oder Apple-Kalender speichern.\n\n30 Minuten vor Beginn schicken wir Ihnen zusätzlich den direkten Link zum Gespräch, damit Sie ihn nicht extra suchen müssen.\n\nSollten Sie den Termin verschieben oder absagen müssen, tun Sie das jederzeit hier:\n\n{{cta:{{button_label}}|{{cancel_url}}}}\n\nWir freuen uns auf das Gespräch!\n\nHerzliche Grüße\n{{recruiter_name}}`,
     button: "Termin verwalten",
   },
-
 };
 
 interface TenantEmail {

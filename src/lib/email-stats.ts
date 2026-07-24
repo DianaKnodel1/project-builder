@@ -54,6 +54,13 @@ export const EMAIL_TYPE_LABELS: Record<string, string> = {
   vermittlung_no_show_24h: "Vermittlung · No-Show 24h",
   vermittlung_registration_pending_24h: "Vermittlung · Registrierung offen 24h",
   vermittlung_registration_pending_72h: "Vermittlung · Registrierung offen 72h",
+  fasttrack_registration_pending_24h: "Fast-Track · Registrierung offen 24h",
+  fasttrack_registration_pending_72h: "Fast-Track · Registrierung offen 72h",
+  vermittlung_rebook_after_cancel_24h: "Vermittlung · Neuer Termin nach Absage 24h",
+  vermittlung_rebook_after_cancel_72h: "Vermittlung · Neuer Termin nach Absage 72h",
+  fasttrack_rebook_after_cancel_24h: "Fast-Track · Neuer Termin nach Absage 24h",
+  fasttrack_rebook_after_cancel_72h: "Fast-Track · Neuer Termin nach Absage 72h",
+  application_received: "Vermittlung · Bewerbung eingegangen",
 };
 
 export interface EmailStats {
