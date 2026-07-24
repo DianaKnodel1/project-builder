@@ -5,12 +5,18 @@ BEGIN;
 UPDATE applications
    SET booking_status = 'cancelled',
        scheduled_at = NULL,
+       status = 'neu',
        updated_at = now() - interval '73 hours'
  WHERE email = :'test_email';
 
 UPDATE interview_appointments
    SET status = 'cancelled',
        updated_at = now() - interval '73 hours'
+ WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email');
+
+-- Invitation-Token entfernen: sonst greift der Registration-Pending-Branch
+-- und der Rebook-Branch wird nie erreicht.
+DELETE FROM invitation_tokens
  WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email');
 
 DELETE FROM application_reminder_log
