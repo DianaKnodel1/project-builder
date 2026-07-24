@@ -24,7 +24,7 @@
 # =============================================================================
 set -euo pipefail
 
-SUITE_VERSION="2026-07-24.1"
+SUITE_VERSION="2026-07-24.2"
 
 : "${SUPABASE_URL:?set SUPABASE_URL}"
 : "${SERVICE_ROLE:?set SERVICE_ROLE}"
@@ -499,6 +499,15 @@ echo "Pause zwischen Mails: ${PAUSE_SECONDS}s   SKIP=$SKIP"
 echo "=========================================================================="
 
 preflight
+
+# Den vorhandenen Bewerbungskontext auch bei einem fortgesetzten Lauf laden.
+# Bisher geschah das nur in Stufe 1; wurde diese per SKIP übersprungen, blieb
+# APP_ID leer und die Reminder-Function filterte nach application_id="".
+load_app_context
+if [[ -z "$APP_ID" ]]; then
+  echo "FEHLER: Keine Test-Bewerbung für $TEST_EMAIL gefunden."
+  exit 1
+fi
 
 run_stage application_received          "Bewerbung eingegangen"            stage_application_received
 run_stage booking_confirmation          "Termin bestätigt"                 stage_booking_confirmation
