@@ -2,12 +2,12 @@
 
 BEGIN;
 
--- Bewerbung als abgesagt markieren, updated_at 25h zurück
+-- Bewerbung als abgesagt markieren. Den Test-Zeitstempel setzen wir ganz am
+-- Ende erneut, weil Termin-/Log-Trigger applications.updated_at ändern können.
 UPDATE applications
    SET booking_status = 'cancelled',
        scheduled_at = NULL,
-       status = 'neu',
-       updated_at = now() - interval '25 hours'
+       status = 'neu'
  WHERE email = :'test_email';
 
 UPDATE interview_appointments
@@ -23,5 +23,11 @@ DELETE FROM invitation_tokens
 DELETE FROM application_reminder_log
  WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email')
    AND reminder_kind = 'rebook_after_cancel_24h';
+
+-- Muss die letzte schreibende Operation sein: Die Function berechnet das
+-- Rebook-Fenster ausschließlich anhand von applications.updated_at.
+UPDATE applications
+   SET updated_at = now() - interval '25 hours'
+ WHERE email = :'test_email';
 
 COMMIT;
