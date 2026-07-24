@@ -316,6 +316,8 @@ serve(async (req) => {
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const dryRun = body?.dry_run === true;
+    const onlyApplicationId: string | null = typeof body?.application_id === "string" ? body.application_id : null;
+    const onlyEmail: string | null = typeof body?.only_email === "string" ? body.only_email.toLowerCase() : null;
 
     // Tenants vorladen
     const { data: tList, error: tErr } = await admin
@@ -330,10 +332,14 @@ serve(async (req) => {
     // ─── Kandidaten laden ───
     // Bewerbungen der letzten 10 Tage — Filterung im Code.
     const since = new Date(now - 10 * 86400_000).toISOString();
-    const { data: apps, error: aErr } = await admin
+    let appsQuery = admin
       .from("applications")
       .select("id,tenant_id,broker_tenant_id,fasttrack_tenant_id,source_slug,source_landing_id,target_landing_id,full_name,email,status,created_at,updated_at,booking_status,scheduled_at,interview_started_at,interview_completed_at,flow_type,magic_token")
       .gte("created_at", since);
+    if (onlyApplicationId) appsQuery = appsQuery.eq("id", onlyApplicationId);
+    if (onlyEmail) appsQuery = appsQuery.ilike("email", onlyEmail);
+    const { data: apps, error: aErr } = await appsQuery;
+
     if (aErr) return json({ error: aErr.message }, 500);
 
     if (!apps?.length) return json({ success: true, dry_run: dryRun, candidates: 0, sent: 0, skipped: 0, failed: 0 });
