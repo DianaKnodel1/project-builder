@@ -1,30 +1,56 @@
-## Ergebnis Stufen 1–2
-Beide grün: Stufe 1 sendet Bewerbungsbestätigung, Stufe 2 „Termin bestätigt" (dry_run: 1 Kandidat, 1 Ziel).
+## Was los ist
 
-## Ursache Stufe 3
-`send-appointment-reminders` (Zeile 239) überspringt Kandidaten ohne `magic_token`. Die Testbewerbung wird in `chain-01-application-received.sql` ohne `magic_token` eingefügt, deshalb `reason: "no_magic_token"`. `send-application-reminders` (Rebook 24h/72h) baut den Rebook-Link ebenfalls über `magic_token` — Stufen 7/8 würden ohne Token dieselbe Lücke haben.
+Der Fehler `Tenant or user not found` kommt **nicht** von der Datenbank, sondern vom **Supavisor-Pooler** vor der DB. Supavisor verlangt bei self-hosted Supabase einen speziellen Benutzernamen im Format `postgres.<tenant_id>` – `postgres` allein reicht ihm nicht, deshalb lehnt er ab, bevor überhaupt ein Passwort geprüft wird.
 
-## Fix
-- `chain-01-application-received.sql`: `magic_token` und `magic_token_expires_at` beim Insert setzen — z. B. `magic_token = encode(gen_random_bytes(24), 'hex')`, `magic_token_expires_at = now() + interval '30 days'`.
-- Spalte im Insert-Header und Value-Liste ergänzen. Alle Folgestufen erben den Token automatisch, da sie nur `UPDATE` machen.
-- `SUITE_VERSION` → `2026-07-23.6`.
-- Vorabcheck erweitern: grep in `chain-01-application-received.sql` auf `magic_token` (verhindert veraltete Kopien auf Server 123).
+Das ist der Grund, warum wir "rotieren": jeder neue Anlauf trifft eine andere Hürde derselben Kette (Env-Var → falsches Passwort-Feld → Pooler-Auth). Mit dem **Endkunden-Mailversand hat das nichts zu tun** – der läuft über Edge Functions und `LOVABLE_API_KEY`/Resend, nicht über `psql`. Bewerber sind davon nicht betroffen. Betroffen ist nur unser **Testskript**, das den DB-Zustand backdatet.
 
-Kein Edge-Function-Code wird angefasst.
+## Fix: Pooler umgehen, direkt zum DB-Container
 
-## Sync + Run
+Der DB-Container `supabase-db` exponiert Port 5432 nur intern (Docker-Netzwerk), nicht am Host. Über die Container-IP erreichen wir ihn direkt und umgehen den Pooler.
+
+### Schritte auf Backend (123)
+
+1. Passwort neu laden (falls Shell frisch):
+   ```bash
+   export POSTGRES_PASSWORD="$(grep -E '^POSTGRES_PASSWORD=' /opt/supabase/docker/.env | head -1 | cut -d= -f2-)"
+   ```
+
+2. Container-IP der DB ermitteln und `DATABASE_URL` setzen:
+   ```bash
+   DB_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' supabase-db | awk '{print $1}')"
+   echo "DB_IP=$DB_IP"
+   export DATABASE_URL="postgresql://supabase_admin:${POSTGRES_PASSWORD}@${DB_IP}:5432/postgres"
+   psql "$DATABASE_URL" -c "select 1" >/dev/null && echo "DB OK"
+   ```
+   Falls `supabase_admin` scheitert, als Fallback `postgres` probieren – bei self-hosted Supabase ist `supabase_admin` aber der Superuser.
+
+3. Wenn `DB OK` erscheint, alle übrigen Vars setzen und Suite starten:
+   ```bash
+   read -rsp "SERVICE_ROLE: " SERVICE_ROLE; echo; export SERVICE_ROLE
+   export TEST_EMAIL="jessikasemen@outlook.com"
+   export TEST_TENANT_ID="ad57153e-c326-408e-80bf-3b2de31ec375"
+   export TEST_SOURCE_LANDING_ID="8d4a3aac-ad75-4083-a153-fe4c8960b61b"
+   export TEST_TARGET_LANDING_ID="e9942bd1-7c11-4df0-b0b6-32c1be32571d"
+   export PAGER=cat PSQL_PAGER=cat
+   bash /opt/apps/portal-migrations/scripts/email-test/run-full-chain.sh
+   ```
+
+### Fallback, falls die Container-IP-Route blockiert
+
+Direkt im DB-Container ausführen:
 ```bash
-# Frontend (124)
-cd /opt/apps/portal && git pull
-tar -czf /tmp/email-test-suite.tgz -C scripts email-test
-scp /tmp/email-test-suite.tgz root@190.97.167.123:/tmp/
-ssh root@190.97.167.123 \
-  'rm -rf /opt/apps/portal-migrations/scripts/email-test &&
-   mkdir -p /opt/apps/portal-migrations/scripts &&
-   tar -xzf /tmp/email-test-suite.tgz -C /opt/apps/portal-migrations/scripts'
-
-# Backend (123)
-bash scripts/email-test/run-full-chain.sh
+docker exec -i supabase-db psql -U supabase_admin -d postgres -c "select 1"
 ```
+Falls das klappt, passe ich das Testskript so an, dass alle SQL-Snippets über `docker exec` laufen statt über `psql` vom Host.
 
-Erwartung: Stufen 1–8 laufen grün, danach kommen 9–14 (Welcome, Auth-Mails, Legacy-Invite, Complete-Registration).
+## Zur eigentlichen Sorge: "Bewerber bekommt keine Mails"
+
+Der Mailversand für Bewerber läuft **komplett unabhängig** von diesem Testskript:
+- Edge Function `send-invitation-email` / `send-booking-confirmation` → Resend/Lovable Mail API → Bewerber.
+- Das Testskript backdatet nur Datensätze, damit wir Reminder-Fenster künstlich auslösen, ohne Tage zu warten.
+
+Ob echte Bewerbermails ankommen, prüfen wir separat über die Edge-Function-Logs im Supabase Studio (Functions → send-invitation-email → Logs). Sag Bescheid, wenn du willst, dass ich das als eigenen, kleinen "Live-Check"-Schritt in den Ablauf einbaue – ganz ohne DB-Manipulation.
+
+## Nach dem Test
+
+Der Service-Role-Key, den du oben im Chat gepostet hast, sollte rotiert werden: Supabase Studio → Settings → API → JWT Secret neu generieren. Danach in allen Deployments (Frontend `.env`, Edge Functions) den neuen Key setzen.
