@@ -377,35 +377,41 @@ stage_interview_invite_30min() {
   invoke_cron_safely "interview_invite_30min" "Interview-Einladung" "send-appointment-reminders" "{}"
 }
 
+# Body-JSON, das send-application-reminders auf genau den Test-Bewerber einschränkt.
+reminder_body() {
+  jq -nc --arg id "$APP_ID" --arg email "$TEST_EMAIL" '{application_id:$id, only_email:$email}'
+}
+
 # ---------- Stufe 4: No-Booking 24h -----------------------------------------
 stage_no_booking_24h() {
   psql_run "$SNIP/chain-04-no-booking-24h.sql" || return 1
-  invoke_cron_safely "no_booking_24h" "Kein Termin 24h" "send-application-reminders" "{}"
+  invoke_cron_safely "no_booking_24h" "Kein Termin 24h" "send-application-reminders" "$(reminder_body)"
 }
 
 # ---------- Stufe 5: No-Booking 72h -----------------------------------------
 stage_no_booking_72h() {
   psql_run "$SNIP/chain-05-no-booking-72h.sql" || return 1
-  invoke_cron_safely "no_booking_72h" "Kein Termin 72h" "send-application-reminders" "{}"
+  invoke_cron_safely "no_booking_72h" "Kein Termin 72h" "send-application-reminders" "$(reminder_body)"
 }
 
 # ---------- Stufe 6: No-Show 24h --------------------------------------------
 stage_no_show_24h() {
   psql_run "$SNIP/chain-06-no-show-24h.sql" || return 1
-  invoke_cron_safely "no_show_24h" "No-Show" "send-application-reminders" "{}"
+  invoke_cron_safely "no_show_24h" "No-Show" "send-application-reminders" "$(reminder_body)"
 }
 
 # ---------- Stufe 7: Rebook 24h nach Absage ---------------------------------
 stage_rebook_after_cancel_24h() {
   psql_run "$SNIP/chain-07-rebook-after-cancel-24h.sql" || return 1
-  invoke_cron_safely "rebook_after_cancel_24h" "Rebook 24h" "send-application-reminders" "{}"
+  invoke_cron_safely "rebook_after_cancel_24h" "Rebook 24h" "send-application-reminders" "$(reminder_body)"
 }
 
 # ---------- Stufe 8: Rebook 72h nach Absage ---------------------------------
 stage_rebook_after_cancel_72h() {
   psql_run "$SNIP/chain-08-rebook-after-cancel-72h.sql" || return 1
-  invoke_cron_safely "rebook_after_cancel_72h" "Rebook 72h" "send-application-reminders" "{}"
+  invoke_cron_safely "rebook_after_cancel_72h" "Rebook 72h" "send-application-reminders" "$(reminder_body)"
 }
+
 
 # ---------- Stufe 9: Willkommens-/Registrierungs-Einladung ------------------
 stage_welcome_invitation() {
