@@ -28,7 +28,9 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "vermittlung_no_show_24h",    label: "No-Show Interview",               group: "Vermittlung", trigger: "24h nach verpasstem Termin" },
   { key: "bewerbung_magic_link",       label: "Vermittlung: Interview-Einladung", group: "Vermittlung", trigger: "30 Minuten vor dem Termin" },
   { key: "booking_confirmation",       label: "Vermittlung: Terminbestätigung",   group: "Vermittlung", trigger: "Direkt nach Terminbuchung" },
-  { key: "vermittlung_registration_pending", keys: ["vermittlung_registration_pending_24h", "vermittlung_registration_pending_72h"], label: "Vermittlung: Registrierung offen", group: "Vermittlung", trigger: "24h / 72h nach Zusage ohne Registrierung" },
+  { key: "application_received",       label: "Vermittlung: Bewerbung eingegangen", group: "Vermittlung", trigger: "Sofort nach Bewerbungseingang (Broker-Flow)" },
+  { key: "vermittlung_registration_pending", keys: ["vermittlung_registration_pending_24h", "vermittlung_registration_pending_72h", "fasttrack_registration_pending_24h", "fasttrack_registration_pending_72h"], label: "Registrierung offen", group: "Vermittlung", trigger: "24h / 72h nach Zusage ohne Registrierung" },
+  { key: "rebook_after_cancel",        keys: ["vermittlung_rebook_after_cancel_24h", "vermittlung_rebook_after_cancel_72h", "fasttrack_rebook_after_cancel_24h", "fasttrack_rebook_after_cancel_72h"], label: "Neuer Termin nach Absage", group: "Vermittlung", trigger: "24h / 72h nach Cancel des Termins" },
   // Fast-Track / Onboarding
   { key: "invitation",                       label: "Herzlichen Glückwunsch", group: "Onboarding", trigger: "Sofort nach Fast-Track-Zusage" },
   { key: "reminder_invite",                  label: "Registrierung abschließen",    group: "Reminder",   trigger: "Akzeptierte Bewerber ohne Account" },
