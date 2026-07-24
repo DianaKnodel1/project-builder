@@ -5,8 +5,7 @@ BEGIN;
 UPDATE applications
    SET booking_status = 'cancelled',
        scheduled_at = NULL,
-       status = 'neu',
-       updated_at = now() - interval '73 hours'
+       status = 'neu'
  WHERE email = :'test_email';
 
 UPDATE interview_appointments
@@ -22,5 +21,11 @@ DELETE FROM invitation_tokens
 DELETE FROM application_reminder_log
  WHERE application_id IN (SELECT id FROM applications WHERE email = :'test_email')
    AND reminder_kind = 'rebook_after_cancel_72h';
+
+-- Muss die letzte schreibende Operation sein: Termin-/Log-Trigger können den
+-- Zeitstempel zuvor wieder auf jetzt setzen.
+UPDATE applications
+   SET updated_at = now() - interval '73 hours'
+ WHERE email = :'test_email';
 
 COMMIT;
