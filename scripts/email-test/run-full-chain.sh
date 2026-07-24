@@ -75,9 +75,14 @@ invoke_fn() {
   local fn="$1"
   local body="${2:-"{}"}"
   local resp status_line body_out status
+  local -a extra_headers=()
+  if [ -n "${CRON_SECRET:-}" ]; then
+    extra_headers+=(-H "x-cron-secret: $CRON_SECRET")
+  fi
   resp=$(curl -sS -X POST "$SUPABASE_URL/functions/v1/$fn" \
     -H "Authorization: Bearer $SERVICE_ROLE" \
     -H "Content-Type: application/json" \
+    "${extra_headers[@]}" \
     -w $'\n__HTTP_STATUS__:%{http_code}' \
     -d "$body") || {
     echo "   ❌ curl-Fehler bei $fn" >&2
