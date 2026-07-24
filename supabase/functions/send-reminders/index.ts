@@ -121,6 +121,7 @@ interface SendCtx {
   admin: ReturnType<typeof createClient>;
   tenants: Map<string, TenantRow>;
   dryRun: boolean;
+  onlyEmail: string | null;
   results: { type: ReminderType; email: string; status: string; error?: string }[];
   // Key: `${tenantId}:${reminderType}`
   sentCountByTenantType: Map<string, number>;
@@ -140,6 +141,12 @@ async function authorize(req: Request, admin: any): Promise<{ ok: true } | { ok:
   const authHeader = req.headers.get("authorization") ?? "";
   const jwt = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
   if (!jwt) return { ok: false, status: 401, msg: "Unauthorized" };
+
+  // Interne Wartungs- und Testläufe dürfen mit dem serverseitigen Service-Role-
+  // Schlüssel aufrufen. Der Wert wird ausschließlich mit dem Function-Secret
+  // verglichen und niemals an den Client oder in Logs ausgegeben.
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (serviceRole && jwt === serviceRole) return { ok: true };
 
   const { data: userRes, error: uErr } = await admin.auth.getUser(jwt);
   if (uErr || !userRes?.user) return { ok: false, status: 401, msg: "Unauthorized" };
@@ -170,6 +177,9 @@ serve(async (req) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const dryRun = body?.dry_run === true;
     const onlyType: ReminderType | null = body?.only_type ?? null;
+    const onlyEmail = typeof body?.only_email === "string" && body.only_email.trim()
+      ? body.only_email.trim().toLowerCase()
+      : null;
     const ignoreQuietHours = body?.ignore_quiet_hours === true;
     const mode: string = body?.mode ?? "reminders";
     const recoveryTenantId: string | null = body?.tenant_id ?? null;
@@ -199,7 +209,7 @@ serve(async (req) => {
       tenants.set(t.id, t as TenantRow);
     });
 
-    const ctx: SendCtx = { admin, tenants, dryRun, results: [], sentCountByTenantType: new Map(), sentCountByTenant12h: new Map(), recoveryStats: new Map() };
+    const ctx: SendCtx = { admin, tenants, dryRun, onlyEmail, results: [], sentCountByTenantType: new Map(), sentCountByTenant12h: new Map(), recoveryStats: new Map() };
 
     // 24h-Cap pro Tenant vorladen (alle bisherigen sent in den letzten 24h).
     {
@@ -469,6 +479,7 @@ async function runInvites(ctx: SendCtx) {
   for (const app of apps ?? []) {
     const email = (app.email ?? "").toLowerCase();
     if (!email || existing.has(email)) continue;
+    if (ctx.onlyEmail && email !== ctx.onlyEmail) continue;
     if (inDripQueue.has(email)) {
       ctx.results.push({ type: "invite", email, status: "skipped", error: "in_drip_queue" });
       await logSkipped(ctx.admin, email, app.tenant_id ?? null, "invite", "in_drip_queue");
@@ -518,6 +529,7 @@ async function runConfirmEmail(ctx: SendCtx) {
   const BLOCKED = new Set(["deaktiviert", "abgelehnt"]);
   const unconfirmed = (usersList?.users ?? []).filter(u => {
     if (!u.email || u.email_confirmed_at) return false;
+    if (ctx.onlyEmail && u.email.toLowerCase() !== ctx.onlyEmail) return false;
     // Skip gebannte Auth-User
     const banned = (u as any).banned_until;
     if (banned && new Date(banned).getTime() > Date.now()) return false;
@@ -608,6 +620,7 @@ async function runCompleteRegistration(ctx: SendCtx) {
   for (const p of profiles ?? []) {
     const u = userMap.get((p as any).user_id);
     if (!u || !u.email_confirmed_at || !u.email) continue; // nur bestätigte Accounts
+    if (ctx.onlyEmail && u.email.toLowerCase() !== ctx.onlyEmail) continue;
     const email = u.email.toLowerCase();
     const tenant = (p as any).tenant_id ? ctx.tenants.get((p as any).tenant_id) : null;
     if (!hasValidSmtp(tenant)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "no_tenant_smtp" }); await logSkipped(ctx.admin, email, (p as any).tenant_id ?? null, "complete_registration", "no_tenant_smtp"); continue; }
