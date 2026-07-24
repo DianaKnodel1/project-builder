@@ -7,7 +7,6 @@ BEGIN;
 
 UPDATE auth.users
    SET email_confirmed_at = NULL,
-       confirmed_at = NULL,
        created_at = now() - interval '2 days'
  WHERE email = :'test_email';
 
