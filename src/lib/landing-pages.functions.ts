@@ -37,7 +37,7 @@ const BrandingSchema = z.object({
   seo_description: z.string().max(640).default(""),
   seo_image: z.string().max(500).default(""),
   // Portal-Design (nur Fast-Track relevant) — steuert Login/Registrierung im Portal
-  portal_theme: z.enum(["classic", "minimal", "split", "image", "soft"]).default("minimal"),
+  portal_theme: z.enum(["clean", "office", "atmosphere"]).default("clean"),
 
 });
 

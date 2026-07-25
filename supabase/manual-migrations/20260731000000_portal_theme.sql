@@ -4,13 +4,20 @@
 --   psql "$DATABASE_URL" -f supabase/manual-migrations/20260731000000_portal_theme.sql
 
 ALTER TABLE public.tenants
-  ADD COLUMN IF NOT EXISTS portal_theme text NOT NULL DEFAULT 'classic';
+  ADD COLUMN IF NOT EXISTS portal_theme text NOT NULL DEFAULT 'clean';
+
+UPDATE public.tenants
+SET portal_theme = CASE
+  WHEN portal_theme IN ('image') THEN 'office'
+  WHEN portal_theme IN ('soft') THEN 'atmosphere'
+  ELSE 'clean'
+END;
 
 ALTER TABLE public.tenants
   DROP CONSTRAINT IF EXISTS tenants_portal_theme_check;
 ALTER TABLE public.tenants
   ADD CONSTRAINT tenants_portal_theme_check
-  CHECK (portal_theme IN ('classic', 'minimal', 'split', 'soft'));
+  CHECK (portal_theme IN ('clean', 'office', 'atmosphere'));
 
 -- Öffentliche View neu aufbauen, damit das Portal das Design ohne Login lesen kann.
 DROP VIEW IF EXISTS public.tenants_public CASCADE;

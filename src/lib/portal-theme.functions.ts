@@ -7,7 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const Input = z.object({
   tenant_id: z.string().uuid(),
-  portal_theme: z.enum(["classic", "minimal", "split", "image", "soft"]),
+  portal_theme: z.enum(["clean", "office", "atmosphere"]),
 });
 
 export const setTenantPortalTheme = createServerFn({ method: "POST" })
