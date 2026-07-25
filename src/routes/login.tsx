@@ -43,6 +43,8 @@ function LoginPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenant } = useTenant();
+  const t = usePortalTheme().tokens;
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
