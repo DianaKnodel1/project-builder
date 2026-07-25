@@ -307,7 +307,8 @@ function RulesEditor({ scheduleId }: { scheduleId: string }) {
             <Input type="time" value={r.start_time} className="w-28"
               onChange={e => setDraft(rules.map((x, i) => i === idx ? { ...x, start_time: e.target.value } : x))} />
             <span>–</span>
-            <Input type="time" value={r.end_time} className="w-28"
+            <Input type="time" value={r.end_time}
+              className={`w-28 ${invalidIdx.includes(idx) ? "border-destructive text-destructive" : ""}`}
               onChange={e => setDraft(rules.map((x, i) => i === idx ? { ...x, end_time: e.target.value } : x))} />
             <Button variant="ghost" size="icon"
               onClick={() => setDraft(rules.filter((_, i) => i !== idx))}>
@@ -318,15 +319,22 @@ function RulesEditor({ scheduleId }: { scheduleId: string }) {
         {rules.length === 0 && (
           <p className="text-xs text-muted-foreground">Noch keine Regeln. Fügen Sie unten eine hinzu.</p>
         )}
+        {invalidIdx.length > 0 && (
+          <p className="text-xs text-destructive">
+            Endzeit muss nach der Startzeit liegen. Fenster über Mitternacht bitte aufteilen:
+            z. B. 08:00–23:59 und am Folgetag 00:00–02:00.
+          </p>
+        )}
         <div className="flex gap-2 pt-2">
           <Button variant="outline" size="sm"
             onClick={() => setDraft([...rules, { weekday: 1, start_time: "09:00", end_time: "12:00" }])}>
             <Plus className="h-4 w-4 mr-1" /> Zeile hinzufügen
           </Button>
-          <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending || !draft}>
+          <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending || !draft || invalidIdx.length > 0}>
             <Save className="h-4 w-4 mr-2" /> Speichern
           </Button>
         </div>
+
       </CardContent>
     </Card>
   );
