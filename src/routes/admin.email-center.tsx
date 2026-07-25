@@ -210,11 +210,13 @@ function AdminEmailCenterPage() {
                 acc.sent += item.sent;
                 acc.failed += item.failed;
                 acc.pending += item.pending;
+                acc.skipped += item.skipped;
                 if (item.last && (!acc.last || item.last > acc.last)) acc.last = item.last;
                 return acc;
-              }, { sent: 0, failed: 0, pending: 0, last: undefined as string | undefined });
-              const total = s.sent + s.failed + s.pending;
+              }, { sent: 0, failed: 0, pending: 0, skipped: 0, last: undefined as string | undefined });
+              const total = s.sent + s.failed + s.pending + s.skipped;
               const lastRel = s.last ? relativeTime(s.last) : null;
+
               return (
                 <Link
                   key={t.key}
