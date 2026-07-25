@@ -424,17 +424,8 @@ export function AdminEmailLogsPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {previewLog?.rendered_html && user?.email && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => previewLog && sendTestToMe(previewLog)}
-                disabled={sendingTest}
-                className="gap-1.5"
-              >
-                <Send className="h-3.5 w-3.5" /> Test an mich senden ({user.email})
-              </Button>
-            )}
+            {null}
+
             {previewLog && previewLog.rendered_html && !isTokenTemplate(previewLog.template_name) && (
               <Button
                 variant="outline"
