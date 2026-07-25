@@ -57,6 +57,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (window.location.pathname === "/portal-designs") {
+      setLoading(false);
+      return;
+    }
     const domain = getTenantDomain();
 
     (async () => {
