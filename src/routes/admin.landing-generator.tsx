@@ -243,6 +243,8 @@ function LandingGeneratorPage() {
   const getFn = useServerFn(getLandingPage);
   const delFn = useServerFn(deleteLandingPage);
   const toggleFn = useServerFn(toggleLandingPublished);
+  const setPortalThemeFn = useServerFn(setTenantPortalTheme);
+
   const [landings, setLandings] = useState<any[]>([]);
   const [landingsLoading, setLandingsLoading] = useState(true);
   const listPartnersFn = useServerFn(listPartnerCompanies);
@@ -633,6 +635,8 @@ document.addEventListener('submit', function(e){
           hrb: b.hrb, registergericht: b.registergericht, ust_id: b.ust_id, steuernummer: b.steuernummer,
           geschaeftsfuehrer: b.geschaeftsfuehrer, impressum: b.impressum,
           api_endpoint: b.api_endpoint, portal_url: b.portal_url, tenant_id: b.tenant_id,
+          portal_theme: b.portal_theme || "classic",
+
           seo_title: b.seo_title, seo_description: b.seo_description, seo_image: b.seo_image,
           recruiter_name: b.recruiter_name || "Sabine Schneider",
           recruiter_avatar_url: b.recruiter_avatar_url || null,
