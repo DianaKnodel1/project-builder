@@ -49,7 +49,6 @@ export function AdminEmailLogsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [resending, setResending] = useState<string | null>(null);
   const [previewLog, setPreviewLog] = useState<EmailLogFull | null>(null);
-  const [sendingTest, setSendingTest] = useState(false);
   const [acking, setAcking] = useState(false);
   const [confirmResend, setConfirmResend] = useState<EmailLogFull | null>(null);
   const ackFn = useServerFn(acknowledgeFailedEmails);
