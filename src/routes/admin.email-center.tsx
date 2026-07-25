@@ -89,22 +89,24 @@ function AdminEmailCenterPage() {
   };
 
   const stats = useMemo(() => {
-    const s = { total: rows.length, sent: 0, failed: 0, pending: 0 };
+    const s = { total: rows.length, sent: 0, failed: 0, pending: 0, skipped: 0 };
     for (const r of rows) {
       if (r.status === "sent") s.sent++;
       else if (r.status === "dlq" || r.status === "failed" || r.status === "bounced") s.failed++;
       else if (r.status === "pending") s.pending++;
+      else if (r.status === "skipped") s.skipped++;
     }
     return s;
   }, [rows]);
 
   const perTemplate = useMemo(() => {
-    const m = new Map<string, { sent: number; failed: number; pending: number; last?: string }>();
+    const m = new Map<string, { sent: number; failed: number; pending: number; skipped: number; last?: string }>();
     for (const r of rows) {
-      const cur = m.get(r.template_name) ?? { sent: 0, failed: 0, pending: 0 };
+      const cur = m.get(r.template_name) ?? { sent: 0, failed: 0, pending: 0, skipped: 0 };
       if (r.status === "sent") cur.sent++;
       else if (r.status === "dlq" || r.status === "failed" || r.status === "bounced") cur.failed++;
       else if (r.status === "pending") cur.pending++;
+      else if (r.status === "skipped") cur.skipped++;
       if (!cur.last || r.created_at > cur.last) cur.last = r.created_at;
       m.set(r.template_name, cur);
     }
@@ -115,10 +117,14 @@ function AdminEmailCenterPage() {
   // Wie viele der aktiven Kettenschritte hatten im Zeitraum mind. einen Versand?
   const coverage = useMemo(() => {
     const active = ACTIVE_TEMPLATES.filter(t =>
-      (t.keys ?? [t.key]).some(k => (perTemplate.get(k)?.sent ?? 0) + (perTemplate.get(k)?.failed ?? 0) + (perTemplate.get(k)?.pending ?? 0) > 0)
+      (t.keys ?? [t.key]).some(k => {
+        const i = perTemplate.get(k);
+        return i ? i.sent + i.failed + i.pending + i.skipped > 0 : false;
+      })
     ).length;
     return { active, total: ACTIVE_TEMPLATES.length };
   }, [perTemplate]);
+
 
 
   const filtered = useMemo(() => {
