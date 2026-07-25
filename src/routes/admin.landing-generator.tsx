@@ -1013,6 +1013,35 @@ document.addEventListener('submit', function(e){
                     <p className="text-[10px] text-muted-foreground mt-1">Tenant-eigenes Portal. Bei Fast-Track wird der Bewerber hierhin zu <code>/register</code> weitergeleitet.</p>
                   </Field>
                 )}
+                {branding.flow_type === "fast" && (
+                  <div className="sm:col-span-2 space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                    <Label className="text-xs font-semibold">Portal-Design (Login & Registrierung)</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Gilt für das Mitarbeiter-Portal dieses Tenants: Login, Registrierung und Passwort-vergessen. Wird beim Speichern auf den Tenant übertragen.
+                    </p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {PORTAL_THEMES.map((pt) => (
+                        <button
+                          key={pt.id}
+                          type="button"
+                          onClick={() => setBranding((b) => ({ ...b, portal_theme: pt.id }))}
+                          className={cn(
+                            "text-left rounded-md border-2 p-3 transition-all text-xs",
+                            branding.portal_theme === pt.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+                          )}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold">{pt.name}</span>
+                            {branding.portal_theme === pt.id && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                          </div>
+                          <PortalThemePreview id={pt.id} />
+                          <p className="text-muted-foreground text-[11px] mt-2">{pt.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <Field label="Supabase URL (optional — nur bei Direkt-Insert)">
                   <Input value={branding.supabase_url} onChange={set("supabase_url")} placeholder="leer lassen" />
                 </Field>
