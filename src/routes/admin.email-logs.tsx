@@ -10,14 +10,13 @@ import { usePagination } from "@/hooks/use-pagination";
 import { PaginationBar } from "@/components/PaginationBar";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TableSkeleton, PageHeaderSkeleton } from "@/components/SkeletonLoaders";
 import { EmptyState } from "@/components/EmptyState";
-import { Mail, RefreshCw, RotateCcw, CheckCircle2, XCircle, AlertTriangle, Eye, Send, Check } from "lucide-react";
+import { Mail, RefreshCw, RotateCcw, CheckCircle2, XCircle, AlertTriangle, Eye, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -42,14 +41,12 @@ type EmailLogFull = EmailLog & {
 };
 
 export function AdminEmailLogsPage() {
-  const { user } = useAuth();
   const [logs, setLogs] = useState<EmailLogFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [resending, setResending] = useState<string | null>(null);
   const [previewLog, setPreviewLog] = useState<EmailLogFull | null>(null);
-  const [sendingTest, setSendingTest] = useState(false);
   const [acking, setAcking] = useState(false);
   const [confirmResend, setConfirmResend] = useState<EmailLogFull | null>(null);
   const ackFn = useServerFn(acknowledgeFailedEmails);
@@ -120,16 +117,7 @@ export function AdminEmailLogsPage() {
     try { await doResend(log); } finally { setResending(null); setConfirmResend(null); }
   };
 
-  // Testkopie an den eingeloggten Admin — funktioniert jetzt für alle Mail-Typen.
-  const sendTestToMe = async (log: EmailLogFull) => {
-    if (!user?.email) {
-      toast({ title: "Keine Admin-E-Mail bekannt", variant: "destructive" });
-      return;
-    }
-    setSendingTest(true);
-    try { await doResend(log, { to: user.email, isTest: true, force: true }); }
-    finally { setSendingTest(false); }
-  };
+
 
 
   const handleAckAll = async () => {
@@ -424,17 +412,8 @@ export function AdminEmailLogsPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {previewLog?.rendered_html && user?.email && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => previewLog && sendTestToMe(previewLog)}
-                disabled={sendingTest}
-                className="gap-1.5"
-              >
-                <Send className="h-3.5 w-3.5" /> Test an mich senden ({user.email})
-              </Button>
-            )}
+            {null}
+
             {previewLog && previewLog.rendered_html && !isTokenTemplate(previewLog.template_name) && (
               <Button
                 variant="outline"
