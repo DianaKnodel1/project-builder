@@ -1,49 +1,53 @@
-## Was ich im Code gesehen habe (verifiziert)
+## Antworten zuerst
 
-**1. "In Warteschlange 7" ist fast sicher ein Zähl-Artefakt, kein echter Queue-Stand.**
-Es gibt keine echte Warteschlange. `status = 'pending'` wird nur an einer Stelle geschrieben: in `send-application-reminders` (Zeile 757), wenn das SMTP-Stundenlimit greift ("wird später erneut versucht"). Beim nächsten Cron-Lauf entsteht eine **neue** Zeile mit `sent`/`failed` — die alte `pending`-Zeile bleibt für immer stehen.
+**Warum sich die Warteschlange nicht geändert hat**
+Die beiden Maßnahmen, die die alten `pending`-Zeilen auflösen, sind noch **nicht auf Backend 123 aktiv**:
+1. das Cleanup-SQL (`scripts/sql/cleanup-superseded-email-log.sql`) wurde noch nicht ausgeführt,
+2. die Edge Function `send-application-reminders` (setzt alte `pending`-Zeilen auf `superseded`) ist noch nicht redeployt.
 
-**2. Die Dedup-Logik lässt diese alten Zeilen nie verschwinden.**
-- Dashboard (`admin.index.tsx`) und E-Mail-Center (`admin.email-center.tsx`) deduplizieren über `message_id`, und wenn keine da ist über `template:email:created_at`. Eine `pending`-Zeile hat **keine** `message_id` und einen anderen Timestamp als der spätere Erfolg → sie wird nie mit dem erfolgreichen Versand zusammengeführt und zählt doppelt.
-- Zusätzlich rechnet das Dashboard `total = computed.total + pending`, also 88 + 12 + 7 = 107 "eindeutige Mails", obwohl es real z. B. 100 logische Mails sind.
+Solange bleiben die alten Zeilen mit Status `pending` stehen — auch wenn die Mail längst raus ist. Die Zahl ist also aktuell überwiegend Alt-Last, kein laufender Rückstau. Bestätigen kann ich das erst mit einer Abfrage auf die echten Zeilen (Alter + Template + Empfänger), das ist Schritt 1 unten.
 
-**3. Drei verschiedene Zählweisen für dieselbe Frage.**
-`src/lib/email-stats.ts` hat eine gute logische Dedup-Funktion (`emailLogKey`/`dedupeEmailLogs`, Tenant + Template + Empfänger + Tag, Status-Priorität), aber:
-- Dashboard nutzt sie nur teilweise (pending separat, eigene Vor-Dedup).
-- E-Mail-Center nutzt sie **gar nicht** — es hat seine eigene message_id-Dedup, KPI-Berechnung und Per-Template-Zählung.
-Deshalb weichen Screenshot 1 (KPI) und Screenshot 2 (Template-Kacheln, z. B. ✓59 / ✗7) voneinander ab und wirken "verbuggt".
+**SMTP-Limits, wie sie aktuell im Code stehen**
 
-**4. Nicht verifiziert:** die exakten 7 Pending- und 12 Fehler-Zeilen konnte ich nicht in der Datenbank nachsehen (Cloud-DB liegt auf dem eigenen Backend). Schritt 1 des Plans prüft das, bevor gefixt wird.
+| Grenze | Wert | Wo |
+|---|---|---|
+| Sendefenster | 06:00–22:00 Europe/Berlin | `send-reminders` (Quiet Hours) |
+| Bewerber-Reminder pro Tenant / Stunde | 150 | `send-application-reminders` |
+| Bewerber-Reminder pro Tenant / 12 h | 1.800 | `send-application-reminders` |
+| Pro Cron-Lauf pro Tenant | 8 | `send-application-reminders` |
+| Onboarding-Reminder pro Lauf / Tenant | 50 | `send-reminders` |
+| Onboarding-Reminder pro Tenant / 24 h | 140 | `send-reminders` |
+
+Dein Vertrag erlaubt 150/Stunde × 16 Stunden = **2.400 Mails pro Tag und Tenant/SMTP**. Der Stundenwert passt (150). Zwei Werte bremsen dich unnötig aus:
+- `MAX_PER_12H_PER_TENANT = 1800` → bei Volllast erreicht man 2.400/Tag nie.
+- `MAX_SENDS_PER_TENANT_PER_24H = 140` in `send-reminders` → das ist ein Tageslimit, obwohl der Vertrag 2.400/Tag hergibt.
 
 ## Plan
 
-**Schritt 1 — Datenbild bestätigen (read-only)**
-Diagnose-Abfrage auf `email_send_log` (letzte 7 Tage): Verteilung nach `status`, `template_name`, Alter der `pending`-Zeilen, und für jede `pending`-Zeile prüfen, ob für Empfänger + Template später eine `sent`-Zeile existiert. Damit ist bewiesen, ob die 7 "Warteschlange" reine Alt-Artefakte sind oder echte Hänger.
+### 1. Warteschlange verifizieren (vor jeder Änderung)
+SQL-Snippet für Backend 123, das die offenen `pending`-Zeilen nach Alter, Template und Empfänger gruppiert, und zeigt, ob es zum selben Empfänger/Template später ein `sent`/`failed` gibt. Damit steht fest, was Alt-Last ist und was echter Hänger. Danach Cleanup-Skript + Redeploy.
 
-**Schritt 2 — Eine gemeinsame Wahrheit für die Statistik**
-In `src/lib/email-stats.ts`:
-- `emailLogKey` so erweitern, dass Retry-Zeilen (pending → sent/failed) desselben logischen Versands zusammenfallen: logischer Schlüssel `tenant|template|empfänger|tag` auch dann, wenn eine `message_id` fehlt, plus ein Zeitfenster für Retries über Tagesgrenzen.
-- Status-Priorität so, dass der **neueste finale** Status gewinnt (sent/failed/bounced schlagen pending).
-- `computeEmailStats` liefert zusätzlich `pending` (nur echte Hänger: pending ist der letzte Zustand) und `stalePending` (pending älter als 6 h ohne Nachfolger).
-- Erfolgsquote = sent / (sent + failed + bounced), pending zählt nicht gegen die Quote.
+### 2. Generischer „Erneut senden“-Button
+Neue Edge Function **`email-resend`**: bekommt eine `email_send_log`-ID, lädt die Zeile, holt SMTP/Absender des Tenants über `_shared/sender-resolver.ts` und versendet den **gespeicherten** `rendered_html` / `rendered_subject` erneut. Das funktioniert für alle Mail-Typen, weil jede Funktion HTML und Subject mitloggt — kein Nachbauen von Template-Variablen, keine abgelaufenen Magic-Links werden neu erzeugt (siehe Hinweis unten).
 
-**Schritt 3 — Dashboard-Widget auf diese Werte umstellen**
-`admin.index.tsx`: eigene Vor-Dedup und `total + pending` entfernen, alle vier Kacheln direkt aus `computeEmailStats` speisen. Kachel "In Warteschlange" zeigt nur echte Hänger; bei `stalePending > 0` ein eigener Hinweis ("hängt seit >6 h") statt stiller Amber-Zahl.
+Verhalten:
+- Admin-Prüfung (Service-Role + Rolle `admin`) und Tenant-Zugehörigkeit
+- Optional `to`-Override → „Testkopie an mich“ funktioniert dann für **jeden** Mail-Typ, nicht nur Einladungen
+- Neuer Log-Eintrag mit `metadata.resent_from = <alte ID>` und `metadata.resent_by`
+- Alte Zeile wird auf `superseded` gesetzt bzw. `acknowledged_at` gefüllt, damit sie aus Fehler/Warteschlange verschwindet
+- Guard: wenn kein `rendered_html` vorhanden (sehr alte Zeilen) → klare Fehlermeldung „nicht erneut sendbar“
+- SMTP-Ratelimit-Fehler werden wie in `send-application-reminders` erkannt und als „später erneut versuchen“ zurückgemeldet
 
-**Schritt 4 — E-Mail-Center auf dieselbe Logik**
-`admin.email-center.tsx`: lokale Dedup löschen und `dedupeEmailLogs` verwenden — für KPI, Per-Template-Kacheln, Fehler-Feed und Verlauf. Danach stimmen Dashboard-KPI und Summe der Template-Kacheln überein. Ergänzend: die Kacheln zeigen ihre Zahlen nur noch aus deduplizierten Zeilen, damit z. B. ✗7 exakt den 7 Zeilen im Fehler-Feed entspricht.
+### 3. UI
+- **Roh-Log** (`admin.email-logs.tsx`): der bestehende „Erneut senden“-Button ruft künftig `email-resend` statt `send-invitation-email` und wird für **alle** Templates sichtbar (nicht nur `failed`/`dlq` — auch bei `sent`, mit Bestätigungsdialog „wirklich nochmal senden?“). „Testkopie an mich“ läuft über denselben Weg.
+- **E-Mail-Center** (`admin.email-center.tsx`): in der Detailliste pro Zeile ein Icon „Erneut senden“ mit Bestätigungsdialog + Toast, danach Reload.
+- Kein Massen-Resend-Button (Schutz vor versehentlichem Fluten); immer einzelne Mail.
 
-**Schritt 5 — Ursache statt Symptom: pending sauber abschließen**
-In `supabase/functions/send-application-reminders/index.ts`: beim erfolgreichen Retry die vorhandene `pending`-Zeile desselben logischen Versands auf den Endstatus **updaten** statt eine zweite Zeile zu schreiben (bzw. die alte pending-Zeile als `superseded` markieren). Damit entstehen keine neuen Artefakte mehr, unabhängig von der UI.
+### 4. Limits an den Vertrag anpassen
+- `MAX_PER_12H_PER_TENANT`: 1800 → 2400 (bzw. auf Tagesfenster umstellen)
+- `send-reminders` `MAX_SENDS_PER_TENANT_PER_24H`: 140 → höher, sofern du das willst (das war bewusst konservativ für Reputation/Warm-up). Sag mir, ob ich auf 1.000+ hochziehen oder konservativ lassen soll.
+- Werte zentral in einer `_shared/limits.ts` bündeln, damit sie nicht an drei Stellen auseinanderlaufen. RUNBOOK aktualisieren.
 
-**Schritt 6 — Altlasten**
-SQL-Snippet für den RUNBOOK: bestehende `pending`-Zeilen, für die es später einen finalen Versand gibt, auf `superseded` setzen; echte Hänger bleiben sichtbar. Du führst es auf Backend 123 aus, ich liefere es fertig.
-
-**Schritt 7 — Gegencheck**
-Nach dem Fix: Dashboard und E-Mail-Center nebeneinander prüfen — identische Gesamtzahl, Summe der Template-Kacheln = KPI, Fehler-Feed-Länge = Fehlerzahl, Erfolgsquote plausibel.
-
-## Technische Details
-
-- Betroffene Dateien: `src/lib/email-stats.ts` (Kern), `src/routes/admin.index.tsx`, `src/routes/admin.email-center.tsx`, `src/routes/admin.email-logs.tsx` (nur Konsistenz-Check), `supabase/functions/send-application-reminders/index.ts`.
-- Keine Schema-Migration nötig; `superseded` ist nur ein Statuswert in der bestehenden Textspalte.
-- Edge-Function-Änderung (Schritt 5) muss auf Backend 123 deployt werden.
+### Technische Hinweise
+- Magic-Link-/Token-Mails (Interview-Einladung, E-Mail-Bestätigung): das gespeicherte HTML enthält den **alten** Link. Bei Templates mit Ablauf (`bewerbung_magic_link`, `signup_confirmation`) zeigt das UI einen Warnhinweis und leitet stattdessen an die dedizierte Funktion (`resend-signup-confirmation`) weiter, wo ein frischer Token generiert wird.
+- Deployment: `email-resend` muss auf Backend 123 deployt werden, das UI kommt mit dem normalen Build.

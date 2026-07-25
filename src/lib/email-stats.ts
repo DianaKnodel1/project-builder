@@ -10,6 +10,8 @@ export interface EmailLog {
   metadata: any;
   created_at: string;
   acknowledged_at?: string | null;
+  rendered_html?: string | null;
+
 }
 
 export const EMAIL_STATUS_COLORS: Record<string, string> = {

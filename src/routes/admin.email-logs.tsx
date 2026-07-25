@@ -31,6 +31,7 @@ import {
 } from "@/lib/email-stats";
 import { acknowledgeFailedEmails } from "@/lib/email-log-ack.functions";
 import { BounceSuppressionPanel } from "@/components/BounceSuppressionPanel";
+import { resendEmailLog, isTokenTemplate } from "@/lib/email-resend";
 
 type EmailLogFull = EmailLog & {
   rendered_html?: string | null;
@@ -50,6 +51,7 @@ export function AdminEmailLogsPage() {
   const [previewLog, setPreviewLog] = useState<EmailLogFull | null>(null);
   const [sendingTest, setSendingTest] = useState(false);
   const [acking, setAcking] = useState(false);
+  const [confirmResend, setConfirmResend] = useState<EmailLogFull | null>(null);
   const ackFn = useServerFn(acknowledgeFailedEmails);
   const { toast } = useToast();
 
@@ -62,7 +64,7 @@ export function AdminEmailLogsPage() {
         supabase
           .from("email_send_log")
           .select("*")
-          .neq("status", "pending")
+          .neq("status", "superseded")
           .gte("created_at", since)
           .order("created_at", { ascending: false }),
       );
@@ -89,59 +91,46 @@ export function AdminEmailLogsPage() {
 
   const { paged, page, setPage, pageCount, rangeFrom, rangeTo, total } = usePagination(filtered, 100);
 
-  const resendEmail = async (log: EmailLog) => {
-    setResending(log.id);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-invitation-email", {
-        body: {
-          to: log.recipient_email,
-          fullName: log.metadata?.full_name || log.recipient_email,
-          firstName: log.metadata?.first_name,
-          lastName: log.metadata?.last_name,
-          registrationLink: log.metadata?.registration_link || window.location.origin,
-          tenantId: log.metadata?.tenant_id,
-        },
+  // Generischer Resend über die Edge Function `email-resend`:
+  // versendet das gespeicherte rendered_html erneut — für JEDEN Mail-Typ.
+  const doResend = async (log: EmailLogFull, opts: { to?: string; isTest?: boolean; force?: boolean } = {}) => {
+    const r = await resendEmailLog(log.id, opts);
+    if (r.ok) {
+      toast({
+        title: opts.isTest ? "Test-Mail verschickt" : "E-Mail erneut gesendet",
+        description: r.to ? `An ${r.to}` : undefined,
       });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      toast({ title: "E-Mail erneut gesendet" });
-      loadData();
-    } catch (err: any) {
-      toast({ title: "Fehler beim Versand", description: err.message, variant: "destructive" });
-    } finally {
-      setResending(null);
+      if (!opts.isTest) await loadData();
+      return true;
     }
+    if (r.code === "token_template") {
+      toast({
+        title: "Link abgelaufen",
+        description: "Diese E-Mail enthält einen zeitlich begrenzten Link. Bitte über den Bewerber-Datensatz einen frischen Link erzeugen.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    toast({ title: "Versand fehlgeschlagen", description: r.message, variant: "destructive" });
+    return false;
   };
 
-  // Testkopie an den eingeloggten Admin schicken (nur für Invitation-Mails sinnvoll,
-  // da nur dort die Edge-Function "send-invitation-email" alle Daten kennt).
+  const resendEmail = async (log: EmailLogFull) => {
+    setResending(log.id);
+    try { await doResend(log); } finally { setResending(null); setConfirmResend(null); }
+  };
+
+  // Testkopie an den eingeloggten Admin — funktioniert jetzt für alle Mail-Typen.
   const sendTestToMe = async (log: EmailLogFull) => {
     if (!user?.email) {
       toast({ title: "Keine Admin-E-Mail bekannt", variant: "destructive" });
       return;
     }
     setSendingTest(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-invitation-email", {
-        body: {
-          to: user.email,
-          fullName: log.metadata?.full_name || "Test Empfänger",
-          firstName: log.metadata?.first_name || "Test",
-          lastName: log.metadata?.last_name || "Empfänger",
-          registrationLink: log.metadata?.registration_link || window.location.origin,
-          tenantId: log.metadata?.tenant_id || log.tenant_id,
-          isTest: true,
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      toast({ title: "Test-Mail verschickt", description: `An ${user.email}` });
-    } catch (err: any) {
-      toast({ title: "Test-Versand fehlgeschlagen", description: err.message, variant: "destructive" });
-    } finally {
-      setSendingTest(false);
-    }
+    try { await doResend(log, { to: user.email, isTest: true, force: true }); }
+    finally { setSendingTest(false); }
   };
+
 
   const handleAckAll = async () => {
     setAcking(true);
@@ -304,13 +293,14 @@ export function AdminEmailLogsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {paged.map((log) => {
-                const canResend = ["failed", "dlq"].includes(log.status);
+                const isFail = ["failed", "dlq"].includes(log.status);
+                const canResend = !!log.rendered_html && !isTokenTemplate(log.template_name);
                 const smtpHost = log.metadata?.smtp_host;
 
                 return (
                   <tr
                     key={log.id}
-                    className={`hover:bg-muted/30 transition-colors cursor-pointer ${canResend ? "bg-destructive/[0.02]" : ""}`}
+                    className={`hover:bg-muted/30 transition-colors cursor-pointer ${isFail ? "bg-destructive/[0.02]" : ""}`}
                     onClick={() => setPreviewLog(log)}
                   >
                     <td className="px-4 py-3">
@@ -349,7 +339,7 @@ export function AdminEmailLogsPage() {
                         </Button>
                         {canResend && (
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                            onClick={() => resendEmail(log)} disabled={resending === log.id} title="Erneut senden">
+                            onClick={() => setConfirmResend(log)} disabled={resending === log.id} title="Erneut senden">
                             <RotateCcw className={`h-3.5 w-3.5 ${resending === log.id ? "animate-spin" : ""}`} />
                           </Button>
                         )}
@@ -434,7 +424,7 @@ export function AdminEmailLogsPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {previewLog?.template_name === "invitation" && user?.email && (
+            {previewLog?.rendered_html && user?.email && (
               <Button
                 variant="outline"
                 size="sm"
@@ -445,13 +435,53 @@ export function AdminEmailLogsPage() {
                 <Send className="h-3.5 w-3.5" /> Test an mich senden ({user.email})
               </Button>
             )}
+            {previewLog && previewLog.rendered_html && !isTokenTemplate(previewLog.template_name) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => { const l = previewLog; setPreviewLog(null); setConfirmResend(l); }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Erneut senden
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setPreviewLog(null)}>Schließen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bestätigung für generischen Resend */}
+      <Dialog open={!!confirmResend} onOpenChange={(open) => !open && setConfirmResend(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>E-Mail erneut senden?</DialogTitle>
+            <DialogDescription>
+              {confirmResend && (
+                <>
+                  „{EMAIL_TYPE_LABELS[confirmResend.template_name] ?? confirmResend.template_name}“ geht erneut an{" "}
+                  <strong>{confirmResend.recipient_email}</strong>. Es wird exakt der gespeicherte Inhalt
+                  von {new Date(confirmResend.created_at).toLocaleString("de-DE")} verschickt.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setConfirmResend(null)}>Abbrechen</Button>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              disabled={!!resending}
+              onClick={() => confirmResend && resendEmail(confirmResend)}
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${resending ? "animate-spin" : ""}`} /> Jetzt senden
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
