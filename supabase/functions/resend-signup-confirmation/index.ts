@@ -101,23 +101,40 @@ serve(async (req) => {
       return json({ success: true }, 200); // generic OK, kein Enumeration-Hint
     }
 
-    await transporter.sendMail({
-      from: `"${senderName}" <${senderEmail}>`,
-      to: email,
-      replyTo: tenant.reply_to_email ?? senderEmail,
-      subject: `Neue Bestätigungs-E-Mail – ${tenant.name}`,
-      html,
+    const mailSubject = `Neue Bestätigungs-E-Mail – ${tenant.name}`;
+    const messageId = `signup_confirmation_resend-${user.id}-${Date.now()}`;
+
+    try {
+      await transporter.sendMail({
+        from: `"${senderName}" <${senderEmail}>`,
+        to: email,
+        replyTo: tenant.reply_to_email ?? senderEmail,
+        subject: mailSubject,
+        html,
+      });
+    } catch (sendErr: any) {
+      await logSend(supabaseAdmin, {
+        messageId, tenantId: tenant.id, to: email, subject: mailSubject, html,
+        senderEmail, status: "failed", error: String(sendErr?.message ?? sendErr).slice(0, 500),
+      });
+      return json({ success: true }, 200); // generic OK, kein Enumeration-Hint
+    }
+
+    await logSend(supabaseAdmin, {
+      messageId, tenantId: tenant.id, to: email, subject: mailSubject, html,
+      senderEmail, status: "sent",
     });
 
     await supabaseAdmin.from("email_logs").insert({
       tenant_id,
       recipient: email,
-      subject: `Neue Bestätigungs-E-Mail – ${tenant.name}`,
+      subject: mailSubject,
       status: "sent",
       template: "signup_confirmation_resend",
     }).then(() => {}, () => {});
 
     return json({ success: true }, 200);
+
   } catch (err: any) {
     console.error(err);
     return json({ error: err?.message ?? "Unknown error" }, 500);
