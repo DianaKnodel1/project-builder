@@ -120,16 +120,7 @@ export function AdminEmailLogsPage() {
     try { await doResend(log); } finally { setResending(null); setConfirmResend(null); }
   };
 
-  // Testkopie an den eingeloggten Admin — funktioniert jetzt für alle Mail-Typen.
-  const sendTestToMe = async (log: EmailLogFull) => {
-    if (!user?.email) {
-      toast({ title: "Keine Admin-E-Mail bekannt", variant: "destructive" });
-      return;
-    }
-    setSendingTest(true);
-    try { await doResend(log, { to: user.email, isTest: true, force: true }); }
-    finally { setSendingTest(false); }
-  };
+
 
 
   const handleAckAll = async () => {
