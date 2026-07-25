@@ -160,8 +160,14 @@ function AdminEmailCenterPage() {
               <div className="text-sm font-semibold">Aktive Mail-Templates</div>
               <div className="text-[11px] text-muted-foreground mt-0.5">Klick auf ein Template öffnet den Editor.</div>
             </div>
-            <div className="text-xs text-muted-foreground">Zeitraum: {range === "24h" ? "24 h" : range === "7d" ? "7 Tage" : "30 Tage"}</div>
+            <div className="text-right">
+              <div className="text-xs font-medium">
+                {coverage.active} von {coverage.total} Schritten aktiv
+              </div>
+              <div className="text-[11px] text-muted-foreground">Zeitraum: {range === "24h" ? "24 h" : range === "7d" ? "7 Tage" : "30 Tage"}</div>
+            </div>
           </div>
+
           <div className="divide-y">
             {ACTIVE_TEMPLATES.map(t => {
               const keys = t.keys ?? [t.key];
