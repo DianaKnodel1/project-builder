@@ -143,7 +143,7 @@ serve(async (req) => {
       const { renderEmail } = await import("../_shared/email-wrapper.ts");
       const { html } = renderEmail({
         subject: `Willkommen${full_name ? `, ${escapeHtml(full_name.split(" ")[0])}` : ""}!`,
-        body: `Bitte bestätige deine E-Mail-Adresse, um deinen Account bei <strong>${escapeHtml(tenant.name)}</strong> zu aktivieren.\n\n{{cta:E-Mail bestätigen|${actionLink}}}\n\nFalls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:\n<a href="${actionLink}" style="color:${tenant.primary_color ?? "#2563eb"};word-break:break-all">${actionLink}</a>`,
+        body: `Bitte bestätige deine E-Mail-Adresse, um deinen Account bei <strong>${escapeHtml(tenant.name)}</strong> zu aktivieren.\n\nDer Bestätigungslink ist 24 Stunden gültig und kann nur einmal verwendet werden. Danach kannst du einfach einen neuen Link anfordern.\n\n{{cta:E-Mail bestätigen|${actionLink}}}\n\nFalls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:\n<a href="${actionLink}" style="color:${tenant.primary_color ?? "#2563eb"};word-break:break-all">${actionLink}</a>`,
         tenant,
         recipient: email,
       });

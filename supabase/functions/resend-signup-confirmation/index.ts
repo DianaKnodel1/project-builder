@@ -84,7 +84,7 @@ serve(async (req) => {
     const { renderEmail } = await import("../_shared/email-wrapper.ts");
     const { html, subject: renderedSubject } = renderEmail({
       subject: `Neue Bestätigungs-E-Mail – ${tenant.name}`,
-      body: `Du hast eine neue Bestätigungs-E-Mail angefordert. Klicke auf den Button, um deinen Account bei <strong>${escapeHtml(tenant.name)}</strong> zu aktivieren.\n\n{{cta:E-Mail bestätigen|${actionLink}}}\n\nFalls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:\n<a href="${actionLink}" style="color:${tenant.primary_color ?? "#2563eb"};word-break:break-all">${actionLink}</a>`,
+      body: `Du hast eine neue Bestätigungs-E-Mail angefordert. Klicke auf den Button, um deinen Account bei <strong>${escapeHtml(tenant.name)}</strong> zu aktivieren.\n\nDer Link ist 24 Stunden gültig und nur einmal nutzbar.\n\n{{cta:E-Mail bestätigen|${actionLink}}}\n\nFalls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:\n<a href="${actionLink}" style="color:${tenant.primary_color ?? "#2563eb"};word-break:break-all">${actionLink}</a>`,
       tenant,
       recipient: email,
     });
