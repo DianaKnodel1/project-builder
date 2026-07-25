@@ -175,6 +175,30 @@ async function logEmailSend(
   }
 }
 
+/**
+ * Schreibt auch übersprungene Mails ins zentrale Log, damit im E-Mail-Center
+ * kein Empfänger unsichtbar verloren geht (Grund steht in error_message).
+ */
+async function logSkip(admin: any, app: any, tenant: TenantRow | null, reason: string) {
+  try {
+    await admin.from("email_send_log").insert({
+      message_id: `${REMINDER_KIND}-${app.id}-skip`,
+      tenant_id: tenant?.id ?? app.tenant_id ?? null,
+      template_name: "interview_invite_30min",
+      recipient_email: app.email ?? "(unbekannt)",
+      status: "skipped",
+      error_message: reason,
+      rendered_subject: null,
+      rendered_html: null,
+      sender_email: tenant?.sender_email ?? tenant?.smtp_username ?? null,
+      metadata: { application_id: app.id, kind: REMINDER_KIND, source: "send-appointment-reminders", skip_reason: reason },
+    });
+  } catch (e) {
+    console.warn("email_send_log skip insert failed:", e);
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -235,16 +259,17 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const a of todo as any[]) {
-      if (!a.email || !a.tenant_id) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_email_or_tenant" }); continue; }
-      if (!a.magic_token) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_magic_token" }); continue; }
+      if (!a.email || !a.tenant_id) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_email_or_tenant" }); if (!dryRun) await logSkip(admin, a, null, "no_email_or_tenant"); continue; }
+      if (!a.magic_token) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_magic_token" }); if (!dryRun) await logSkip(admin, a, null, "no_magic_token"); continue; }
       const tenant = tenants.get(a.tenant_id);
-      if (!tenant) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_missing" }); continue; }
-      if (tenant.emails_paused) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_paused" }); continue; }
-      if (!hasValidSmtp(tenant)) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "smtp_incomplete" }); continue; }
+      if (!tenant) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_missing" }); if (!dryRun) await logSkip(admin, a, null, "tenant_missing"); continue; }
+      if (tenant.emails_paused) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_paused" }); if (!dryRun) await logSkip(admin, a, tenant, "tenant_paused"); continue; }
+      if (!hasValidSmtp(tenant)) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "smtp_incomplete" }); if (!dryRun) await logSkip(admin, a, tenant, "smtp_incomplete"); continue; }
 
       const landing = a.target_landing_id ? landingMap.get(a.target_landing_id) : null;
       const domain = landing?.domain || tenant.primary_domain || tenant.domain;
-      if (!domain) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_domain" }); continue; }
+      if (!domain) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_domain" }); if (!dryRun) await logSkip(admin, a, tenant, "no_domain"); continue; }
+
 
       const magicLink = `https://${domain}/bewerbung?token=${a.magic_token}`;
       const startsAt = new Date(a.scheduled_at);

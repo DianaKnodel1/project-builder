@@ -12,6 +12,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { MAX_PER_24H_PER_TENANT } from "../_shared/limits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,9 +119,9 @@ serve(async (req) => {
   const tMap = new Map<string, any>();
   (tenants ?? []).forEach((t: any) => tMap.set(t.id, t));
 
-  // Welle-1: 140 Mails/Tag/Tenant (über reminder_log + email_send_log gemessen).
+  // Tageskontingent zentral aus _shared/limits.ts (2.400/Tag/Tenant) (über reminder_log + email_send_log gemessen).
   // Pre-fetch der letzten 24h, damit Drip nicht das Cap reißt.
-  const TENANT_DAILY_CAP = 140;
+  const TENANT_DAILY_CAP = MAX_PER_24H_PER_TENANT;
   const cutoff24h = new Date(Date.now() - 24 * 3600_000).toISOString();
   const tenantCount24h = new Map<string, number>();
   for (const tid of tenantIds) {

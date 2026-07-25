@@ -18,8 +18,10 @@ export const MAX_PER_12H_PER_TENANT = 1800;
 /** Tageskontingent (16 Stunden Sendefenster × 150). */
 export const MAX_PER_24H_PER_TENANT = 2400;
 
-/** Bewerber-Reminder pro Cron-Lauf und Tenant (Cron alle 30 Min). */
-export const MAX_PER_RUN_PER_TENANT = 8;
+/** Bewerber-Reminder pro Cron-Lauf und Tenant (Cron alle 30 Min).
+ *  60 pro Lauf × 2 Läufe/h = 120/h — bleibt unter der harten 1h-Grenze (150),
+ *  die zusätzlich live aus email_send_log geprüft wird. */
+export const MAX_PER_RUN_PER_TENANT = 60;
 
 /** Onboarding-Reminder (send-reminders) pro Lauf, Tenant und Typ. */
 export const MAX_SENDS_PER_RUN_PER_TENANT = 50;
