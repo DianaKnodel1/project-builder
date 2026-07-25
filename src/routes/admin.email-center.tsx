@@ -26,7 +26,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "vermittlung_no_booking_24h", label: "Vermittlung: Kein Termin (24h)",  group: "Vermittlung", trigger: "24h nach Bewerbung ohne Calendly-Buchung" },
   { key: "vermittlung_no_booking_72h", label: "Vermittlung: Kein Termin (72h)",  group: "Vermittlung", trigger: "72h nach Bewerbung ohne Calendly-Buchung" },
   { key: "vermittlung_no_show_24h",    label: "No-Show Interview",               group: "Vermittlung", trigger: "24h nach verpasstem Termin" },
-  { key: "bewerbung_magic_link",       label: "Vermittlung: Interview-Einladung", group: "Vermittlung", trigger: "30 Minuten vor dem Termin" },
+  { key: "interview_invite_30min",     keys: ["interview_invite_30min", "bewerbung_magic_link"], label: "Vermittlung: Interview-Einladung", group: "Vermittlung", trigger: "30 Minuten vor dem Termin" },
   { key: "booking_confirmation",       label: "Vermittlung: Terminbestätigung",   group: "Vermittlung", trigger: "Direkt nach Terminbuchung" },
   { key: "application_received",       label: "Vermittlung: Bewerbung eingegangen", group: "Vermittlung", trigger: "Sofort nach Bewerbungseingang (Broker-Flow)" },
   { key: "vermittlung_registration_pending", keys: ["vermittlung_registration_pending_24h", "vermittlung_registration_pending_72h", "fasttrack_registration_pending_24h", "fasttrack_registration_pending_72h"], label: "Registrierung offen", group: "Vermittlung", trigger: "24h / 72h nach Zusage ohne Registrierung" },
