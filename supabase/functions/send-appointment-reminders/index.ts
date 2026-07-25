@@ -17,6 +17,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import { renderEmail } from "../_shared/email-wrapper.ts";
+import { guardSend } from "../_shared/send-guard.ts";
 
 const FUNCTION_VERSION = "2026-07-09-interview-invite-30min-v1";
 const REMINDER_KIND = "interview_invite_30min";
@@ -292,6 +293,14 @@ serve(async (req) => {
       };
 
       if (dryRun) { sent++; results.push({ application_id: a.id, status: "would_send", to: a.email, magic_link: magicLink }); continue; }
+
+      // Reminder: Sendefenster 06–22 Uhr + Kontingent (150/h, 2.400/Tag).
+      const allowance = await guardSend({
+        admin, tenantId: tenant.id, templateName: REMINDER_KIND, recipient: a.email,
+        kind: "reminder", senderEmail: tenant.sender_email ?? tenant.smtp_username,
+        metadata: { application_id: a.id, source: "send-appointment-reminders" },
+      });
+      if (!allowance.allowed) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: allowance.reason }); continue; }
 
       let renderedSubject = "";
       let html = "";
