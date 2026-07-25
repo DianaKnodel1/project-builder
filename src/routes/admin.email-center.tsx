@@ -96,6 +96,15 @@ function AdminEmailCenterPage() {
     return m;
   }, [rows]);
 
+  // Wie viele der aktiven Kettenschritte hatten im Zeitraum mind. einen Versand?
+  const coverage = useMemo(() => {
+    const active = ACTIVE_TEMPLATES.filter(t =>
+      (t.keys ?? [t.key]).some(k => (perTemplate.get(k)?.sent ?? 0) + (perTemplate.get(k)?.failed ?? 0) + (perTemplate.get(k)?.pending ?? 0) > 0)
+    ).length;
+    return { active, total: ACTIVE_TEMPLATES.length };
+  }, [perTemplate]);
+
+
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     if (!ql) return rows.slice(0, 100);
