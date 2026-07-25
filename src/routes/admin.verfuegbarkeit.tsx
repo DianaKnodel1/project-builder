@@ -263,8 +263,22 @@ function RulesEditor({ scheduleId }: { scheduleId: string }) {
     end_time: r.end_time.slice(0, 5),
   })) ?? []);
 
+  // Ende muss nach dem Start liegen (DB-Constraint). Nacht-Fenster (08:00–02:00)
+  // müssen in zwei Zeilen aufgeteilt werden, z. B. 08:00–23:59.
+  const invalidIdx = rules
+    .map((r, i) => (r.start_time && r.end_time && r.end_time <= r.start_time ? i : -1))
+    .filter(i => i >= 0);
+
   const save = useMutation({
-    mutationFn: () => saveFn({ data: { schedule_id: scheduleId, rules } }),
+    mutationFn: async () => {
+      if (invalidIdx.length > 0) {
+        throw new Error(
+          "Bei mindestens einer Zeile liegt die Endzeit vor oder gleich der Startzeit. " +
+          "Zeitfenster über Mitternacht bitte aufteilen (z. B. 08:00–23:59 und am Folgetag 00:00–02:00).",
+        );
+      }
+      return saveFn({ data: { schedule_id: scheduleId, rules } });
+    },
     onSuccess: () => {
       toast({ title: "Wochenraster gespeichert" });
       qc.invalidateQueries({ queryKey: ["rules", scheduleId] });
@@ -272,6 +286,7 @@ function RulesEditor({ scheduleId }: { scheduleId: string }) {
     },
     onError: (e: any) => toast({ title: "Fehler", description: e?.message, variant: "destructive" }),
   });
+
 
   return (
     <Card>
