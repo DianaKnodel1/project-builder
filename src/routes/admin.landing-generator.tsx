@@ -665,7 +665,22 @@ document.addEventListener('submit', function(e){
       } as any });
       setEditingId((row as any).id);
       setSlug((row as any).slug);
+
+      // Portal-Design auf den Tenant übertragen (nur Fast-Track hat ein Portal).
+      if (branding.flow_type === "fast" && branding.tenant_id) {
+        try {
+          await setPortalThemeFn({ data: { tenant_id: branding.tenant_id, portal_theme: branding.portal_theme || "classic" } });
+        } catch (e: any) {
+          toast({
+            title: "Portal-Design nicht übernommen",
+            description: e?.message ?? String(e),
+            variant: "destructive",
+          });
+        }
+      }
+
       const r: any = row;
+
       const dnsLabel = r.dnsStatus === "auto" ? "DNS automatisch gesetzt" : r.dnsStatus === "manual" ? "DNS-Hinweis (kein Fehler)" : r.dnsStatus === "skipped" ? "Kein Server im Pool" : "DNS-Fehler";
       const serverLabel = r.assignedServer ? `Server: ${r.assignedServer.name}` : "Kein Server zugewiesen";
       const isHardError = r.dnsStatus === "error";
