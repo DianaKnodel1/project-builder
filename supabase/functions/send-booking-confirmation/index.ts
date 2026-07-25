@@ -13,6 +13,7 @@ import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import { renderEmail } from "../_shared/email-wrapper.ts";
 import { resolveSender } from "../_shared/sender-resolver.ts";
 import { pickLandingLogo, resolveEmailLogo, type LogoResolution } from "../_shared/email-logo.ts";
+import { guardSend } from "../_shared/send-guard.ts";
 
 const FUNCTION_VERSION = "2026-07-18-booking-confirmation-v3-lookback72h";
 const REMINDER_KIND = "booking_confirmation";
@@ -330,6 +331,14 @@ serve(async (req) => {
       });
 
       if (dryRun) { sent++; results.push({ id: appt.id, status: "would_send", to: app.email }); continue; }
+
+      // Kontingent-Schutz (150/h, 2.400/Tag). Blockade wird als "skipped" geloggt.
+      const allowance = await guardSend({
+        admin, tenantId: tenant.id, templateName: REMINDER_KIND, recipient: app.email,
+        kind: "transactional", senderEmail: tenant.sender_email ?? tenant.smtp_username,
+        metadata: { appointment_id: appt.id, application_id: app.id, source: "send-booking-confirmation" },
+      });
+      if (!allowance.allowed) { skipped++; results.push({ id: appt.id, reason: allowance.reason }); continue; }
 
       try {
         const transporter = nodemailer.createTransport({

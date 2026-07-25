@@ -47,24 +47,32 @@ export default function PortalAuthShell({
         </span>
       )}
       <span
-        className={`font-heading font-semibold text-sm ${onImage ? "text-primary-foreground" : "text-foreground"}`}
+        className={`font-heading font-semibold text-sm tracking-tight ${
+          onImage ? "text-primary-foreground [text-shadow:0_1px_3px_rgb(0_0_0/0.5)]" : "text-foreground"
+        }`}
       >
         {name}
       </span>
+
     </div>
   );
 
   const legalRow = (
-    <div className={`mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 ${onImage ? "text-xs text-primary-foreground/80" : t.mutedText}`}>
+    <div
+      className={`mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-xs ${
+        onImage ? "text-primary-foreground/90 [text-shadow:0_1px_3px_rgb(0_0_0/0.55)]" : "text-muted-foreground"
+      }`}
+    >
       <a href="/impressum" className="hover:underline">
         Impressum
       </a>
-      <span className="h-1 w-1 rounded-full bg-border" />
+      <span className={`h-1 w-1 rounded-full ${onImage ? "bg-primary-foreground/60" : "bg-border"}`} />
       <a href="/datenschutz" className="hover:underline">
         Datenschutz
       </a>
     </div>
   );
+
 
   const formBlock = (
     <div className={`w-full ${maxW} relative`}>
@@ -112,10 +120,24 @@ export default function PortalAuthShell({
     <div className={t.page}>
       {onImage && (
         <>
-          <img src={bgUrl} alt="" className={`absolute inset-0 h-full w-full object-cover ${theme.id === "atmosphere" ? "scale-105 blur-sm" : ""}`} width={1920} height={1280} aria-hidden />
-          <div className="absolute inset-0 bg-foreground/45" aria-hidden />
+          <img
+            src={bgUrl}
+            alt=""
+            className={`absolute inset-0 h-full w-full object-cover ${
+              theme.id === "atmosphere" ? "scale-105 blur-[2px]" : ""
+            }`}
+            width={1920}
+            height={1280}
+            aria-hidden
+          />
+          {/* Verlauf: oben leicht, unten kräftig — Bild bleibt erkennbar, Texte lesbar. */}
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-foreground/45 via-foreground/35 to-foreground/70"
+            aria-hidden
+          />
         </>
       )}
+
 
       {t.decor === "glow" && (
         <>

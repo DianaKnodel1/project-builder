@@ -56,9 +56,9 @@ function PortalDesignsPreview() {
           </div>
           <Button className={t.primaryButton}>Anmelden</Button>
           <div className="flex items-center gap-3">
-            <span className={`h-px flex-1 ${t.dividerLine}`} />
-            <span className={t.dividerLabel}>oder</span>
-            <span className={`h-px flex-1 ${t.dividerLine}`} />
+            <span className="h-px flex-1 bg-border" />
+            <span className={`${t.dividerLabel} bg-transparent`}>oder</span>
+            <span className="h-px flex-1 bg-border" />
           </div>
           <Button variant="outline" className={t.secondaryButton}>
             Neu registrieren

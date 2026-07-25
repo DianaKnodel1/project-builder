@@ -48,7 +48,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "password_reset",                   label: "Passwort zurücksetzen",        group: "Auth",       trigger: "User löst Reset aus" },
 ];
 
-type Row = EmailLog;
+type Row = EmailLog & { tenant_id?: string | null };
 
 function AdminEmailCenterPage() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -56,23 +56,93 @@ function AdminEmailCenterPage() {
   const [range, setRange] = useState<"24h" | "7d" | "30d">("7d");
   const [q, setQ] = useState("");
   const [confirmResend, setConfirmResend] = useState<Row | null>(null);
+  /** Exakte Gesamtzahl aus der DB — unabhängig vom 5.000-Zeilen-Fenster der Liste. */
+  const [exactTotal, setExactTotal] = useState<number | null>(null);
+  const [tenantNames, setTenantNames] = useState<Record<string, string>>({});
+  const [visible, setVisible] = useState(100);
   const [resending, setResending] = useState(false);
   const { toast } = useToast();
 
   const load = async () => {
     setLoading(true);
     const since = new Date(Date.now() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 86400_000).toISOString();
-    const { data } = await supabase
-      .from("email_send_log")
-      .select("id,message_id,template_name,recipient_email,status,error_message,metadata,created_at,acknowledged_at,rendered_html")
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(5000);
+    const [{ data }, { count }, { data: tenants }] = await Promise.all([
+      supabase
+        .from("email_send_log")
+        .select("id,message_id,tenant_id,template_name,recipient_email,status,error_message,metadata,created_at,acknowledged_at,rendered_html")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabase
+        .from("email_send_log")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since)
+        .neq("status", "superseded"),
+      supabase.from("tenants").select("id,name"),
+    ]);
     setRows(((data as Row[] | null) ?? []).filter(r => r.status !== "superseded"));
+    setExactTotal(count ?? null);
+    setTenantNames(Object.fromEntries(((tenants as { id: string; name: string }[] | null) ?? []).map(t => [t.id, t.name])));
+    setVisible(100);
     setLoading(false);
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [range]);
+
+  /** Tagesverlauf: echte Sendungen pro Tag (für die Balken). */
+  const daily = useMemo(() => {
+    const days = range === "24h" ? 1 : range === "7d" ? 7 : 30;
+    const buckets: { day: string; sent: number; failed: number; skipped: number }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400_000);
+      buckets.push({ day: d.toISOString().slice(0, 10), sent: 0, failed: 0, skipped: 0 });
+    }
+    const idx = new Map(buckets.map((b, i) => [b.day, i]));
+    for (const r of rows) {
+      const i = idx.get(r.created_at.slice(0, 10));
+      if (i === undefined) continue;
+      if (r.status === "sent") buckets[i].sent++;
+      else if (["failed", "dlq", "bounced"].includes(r.status)) buckets[i].failed++;
+      else if (r.status === "skipped") buckets[i].skipped++;
+    }
+    return buckets;
+  }, [rows, range]);
+
+  /** Volumen pro Tenant — zeigt, wer wie viel vom Kontingent verbraucht. */
+  const perTenant = useMemo(() => {
+    const m = new Map<string, { sent: number; failed: number; skipped: number }>();
+    for (const r of rows) {
+      const key = r.tenant_id ?? "—";
+      const cur = m.get(key) ?? { sent: 0, failed: 0, skipped: 0 };
+      if (r.status === "sent") cur.sent++;
+      else if (["failed", "dlq", "bounced"].includes(r.status)) cur.failed++;
+      else if (r.status === "skipped") cur.skipped++;
+      m.set(key, cur);
+    }
+    return Array.from(m.entries())
+      .map(([id, v]) => ({ id, name: tenantNames[id] ?? (id === "—" ? "Ohne Mandant" : id.slice(0, 8)), ...v }))
+      .sort((a, b) => b.sent - a.sent);
+  }, [rows, tenantNames]);
+
+  /** CSV-Export des aktuellen Zeitraums (alle geladenen Zeilen). */
+  const exportCsv = () => {
+    const head = ["Zeitpunkt", "Mandant", "Template", "Empfaenger", "Status", "Fehler"];
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const body = rows.map(r => [
+      new Date(r.created_at).toLocaleString("de-DE"),
+      tenantNames[r.tenant_id ?? ""] ?? "",
+      r.template_name,
+      r.recipient_email,
+      r.status,
+      r.error_message ?? "",
+    ].map(esc).join(";"));
+    const blob = new Blob(["\uFEFF" + [head.map(esc).join(";"), ...body].join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `email-log-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const doResend = async (row: Row) => {
     setResending(true);
@@ -130,12 +200,13 @@ function AdminEmailCenterPage() {
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    if (!ql) return rows.slice(0, 100);
+    if (!ql) return rows;
     return rows.filter(r =>
       r.recipient_email?.toLowerCase().includes(ql) ||
       r.template_name?.toLowerCase().includes(ql)
-    ).slice(0, 100);
+    );
   }, [rows, q]);
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
 
   return (
     <div className="p-6 lg:p-8 space-y-5 max-w-6xl mx-auto">
@@ -155,6 +226,7 @@ function AdminEmailCenterPage() {
               {k === "24h" ? "24 h" : k === "7d" ? "7 Tage" : "30 Tage"}
             </Button>
           ))}
+          <Button size="sm" variant="outline" onClick={exportCsv} className="h-8 text-xs">CSV</Button>
           <Button size="sm" variant="ghost" onClick={load} disabled={loading} className="h-8">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -178,13 +250,61 @@ function AdminEmailCenterPage() {
 
       {/* KPI */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi label="Gesamt" value={stats.total} icon={Mail} tone="muted" />
+        <Kpi label="Gesamt" value={exactTotal ?? stats.total} icon={Mail} tone="muted" />
         <Kpi label="Versendet" value={stats.sent} icon={CheckCircle2} tone="emerald" />
         <Kpi label="Ausstehend" value={stats.pending} icon={Clock} tone="amber" />
         <Kpi label="Übersprungen" value={stats.skipped} icon={Clock} tone="muted" />
         <Kpi label="Fehlgeschlagen" value={stats.failed} icon={XCircle} tone="rose" />
       </div>
 
+
+      {/* Tagesverlauf */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-sm font-semibold">Versand-Volumen pro Tag</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">
+            Grenzen: 150 Mails/Stunde und 2.400 Mails/Tag je Mandant.
+          </div>
+          <div className="mt-4 flex items-end gap-1 h-28">
+            {daily.map(d => {
+              const max = Math.max(1, ...daily.map(x => x.sent + x.failed + x.skipped));
+              const h = (n: number) => `${Math.round((n / max) * 100)}%`;
+              return (
+                <div key={d.day} className="flex-1 flex flex-col justify-end gap-0.5 group relative" title={`${d.day}: ${d.sent} gesendet, ${d.failed} Fehler, ${d.skipped} übersprungen`}>
+                  {d.skipped > 0 && <div className="w-full bg-muted rounded-sm" style={{ height: h(d.skipped) }} />}
+                  {d.failed > 0 && <div className="w-full bg-rose-500/70 rounded-sm" style={{ height: h(d.failed) }} />}
+                  <div className="w-full bg-primary/80 rounded-sm" style={{ height: h(d.sent) }} />
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex items-center gap-4 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-primary/80" /> Gesendet</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-rose-500/70" /> Fehler</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-muted" /> Übersprungen</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mandanten-Aufschlüsselung */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="px-4 py-3 border-b text-sm font-semibold">Volumen pro Mandant</div>
+          <div className="divide-y">
+            {perTenant.slice(0, 10).map(t => (
+              <div key={t.id} className="px-4 py-2 flex items-center gap-4 text-xs">
+                <span className="flex-1 truncate font-medium">{t.name}</span>
+                <span className="text-emerald-600 tabular-nums">✓ {t.sent}</span>
+                <span className="text-rose-600 tabular-nums">✗ {t.failed}</span>
+                <span className="text-muted-foreground tabular-nums">⤼ {t.skipped}</span>
+              </div>
+            ))}
+            {perTenant.length === 0 && (
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">Kein Versand im Zeitraum.</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Aktive Templates */}
       <Card>
@@ -304,7 +424,7 @@ function AdminEmailCenterPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((r, i) => (
+                {shown.map((r, i) => (
                   <tr key={i} className="hover:bg-muted/20">
                     <td className="px-4 py-1.5 font-mono text-[11px]">{r.template_name}</td>
                     <td className="px-4 py-1.5 text-muted-foreground">{r.recipient_email}</td>
@@ -325,6 +445,14 @@ function AdminEmailCenterPage() {
               </tbody>
             </table>
           </div>
+          {filtered.length > shown.length && (
+            <div className="px-4 py-3 border-t flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{shown.length} von {filtered.length} Einträgen</span>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setVisible(v => v + 200)}>
+                Mehr anzeigen
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

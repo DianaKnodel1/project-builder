@@ -13,6 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import { resolveSender, type EmailKind } from "../_shared/sender-resolver.ts";
 import { pickLandingLogo, resolveEmailLogo } from "../_shared/email-logo.ts";
+import { guardSend } from "../_shared/send-guard.ts";
 
 
 const corsHeaders = {
@@ -370,6 +371,21 @@ serve(async (req) => {
       template_name: templateNameOverride || "invitation",
       ...logoMetadata,
     };
+
+    // Kontingent-Schutz: verhindert SMTP-Blocks (150/h, 2.400/Tag) und
+    // protokolliert die Blockade als "skipped" im E-Mail-Center.
+    const allowance = await guardSend({
+      admin: supabaseAdmin,
+      tenantId: tenant.id,
+      templateName: templateNameOverride || "invitation",
+      recipient: to,
+      kind: "transactional",
+      senderEmail,
+      metadata: smtpMeta,
+    });
+    if (!allowance.allowed) {
+      return json({ error: `Versand blockiert: ${allowance.reason}`, skipped: true, reason: allowance.reason }, 429);
+    }
 
     const verifyRes = await verifyOrPause(supabaseAdmin, tenant, transporter);
     if (!verifyRes.ok) {

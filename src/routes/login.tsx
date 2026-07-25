@@ -246,14 +246,12 @@ function LoginPage() {
         </Button>
       </form>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className={t.dividerLine} />
-        </div>
-        <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
-          <span className={t.dividerLabel}>Neu hier?</span>
-        </div>
+      <div className="flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className={`${t.dividerLabel} bg-transparent text-[11px] uppercase tracking-wider`}>Neu hier?</span>
+        <span className="h-px flex-1 bg-border" />
       </div>
+
 
       <Button size="lg" variant="outline" className={t.secondaryButton} onClick={() => navigate("/register")}>
         Konto erstellen

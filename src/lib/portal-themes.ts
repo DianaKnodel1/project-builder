@@ -46,44 +46,46 @@ export interface PortalTheme {
 }
 
 const clean: PortalThemeTokens = {
-  page: "min-h-screen flex flex-col bg-muted/30",
+  page: "min-h-screen flex flex-col bg-muted/30 font-sans",
   decor: "none",
   brandPanel: false,
-  card: "rounded-lg border border-border bg-card shadow-sm",
+  card: "rounded-xl border border-border bg-card shadow-sm",
   cardPadding: "p-7 sm:p-9 space-y-6",
   heading: "text-xl font-heading font-semibold text-foreground",
-  subText: "text-sm text-muted-foreground leading-relaxed",
-  label: "text-sm font-medium text-foreground",
-  input: "h-11",
-  primaryButton: "w-full h-11 text-sm font-semibold",
-  secondaryButton: "w-full h-11 text-sm font-medium",
-  mutedText: "text-xs text-muted-foreground",
+  subText: "font-sans text-sm text-muted-foreground leading-relaxed",
+  label: "font-sans text-sm font-medium text-foreground",
+  input: "h-11 font-sans",
+  primaryButton: "w-full h-11 font-sans text-sm font-semibold",
+  secondaryButton: "w-full h-11 font-sans text-sm font-medium",
+  mutedText: "font-sans text-xs text-muted-foreground",
   dividerLine: "w-full border-t border-border",
-  dividerLabel: "bg-card px-3 text-muted-foreground",
+  dividerLabel: "bg-card px-3 font-sans text-muted-foreground",
   warnBox: "rounded-lg border border-border bg-muted/50 p-3 flex items-start gap-3",
-  warnText: "text-xs text-foreground",
-  warnAction: "text-xs font-medium text-primary underline hover:no-underline",
-  errorBox: "rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive",
-  wizardPage: "min-h-screen flex items-center justify-center bg-muted/30 p-4",
+  warnText: "font-sans text-xs text-foreground",
+  warnAction: "font-sans text-xs font-medium text-primary underline hover:no-underline",
+  errorBox: "rounded-lg border border-destructive/30 bg-destructive/10 p-3 font-sans text-sm text-destructive",
+  wizardPage: "min-h-screen flex items-center justify-center bg-muted/30 p-4 font-sans",
   wizardCard: "w-full max-w-lg border border-border bg-card shadow-sm",
 };
 
 const office: PortalThemeTokens = {
   ...clean,
-  page: "min-h-screen flex flex-col relative overflow-hidden bg-background",
+  page: "min-h-screen flex flex-col relative overflow-hidden bg-background font-sans",
   decor: "image",
-  card: "rounded-lg border border-border/70 bg-card/95 backdrop-blur-sm shadow-xl",
+  card: "rounded-xl border border-border/60 bg-card shadow-2xl",
   cardPadding: "p-7 sm:p-9 space-y-6",
   heading: "text-2xl font-heading font-semibold text-foreground",
-  wizardPage: "min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background",
-  wizardCard: "w-full max-w-lg rounded-lg border border-border/70 bg-card/95 backdrop-blur-sm shadow-xl",
+  dividerLabel: "bg-card px-3 font-sans text-muted-foreground",
+  wizardPage: "min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background font-sans",
+  wizardCard: "w-full max-w-lg rounded-xl border border-border/60 bg-card shadow-2xl",
 };
 
 const atmosphere: PortalThemeTokens = {
   ...office,
-  card: "rounded-lg border border-border/60 bg-card/90 backdrop-blur-md shadow-xl",
+  card: "rounded-2xl border border-border/50 bg-card shadow-2xl",
   cardPadding: "p-8 sm:p-10 space-y-6",
 };
+
 
 export const PORTAL_THEMES: PortalTheme[] = [
   {
