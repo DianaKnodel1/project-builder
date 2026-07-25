@@ -3,10 +3,9 @@
  * Login, Registrierung, Passwort vergessen.
  *
  * Auswahl erfolgt im Landing-Generator (nur Fast-Track) und wird am Tenant
- * gespeichert (`tenants.portal_theme`). Ohne Auswahl gilt "minimal".
+ * gespeichert (`tenants.portal_theme`). Ohne Auswahl gilt "clean".
  *
- * Stand 2026-07: schlichte, helle Designs. Das alte dunkle "classic"
- * (Wellen-Grafik) wurde entfernt und wird auf "minimal" gemappt.
+ * Stand 2026-07: drei schlichte Varianten: hell, Office-Foto und Markenbild.
  */
 
 export type PortalThemeId = "clean" | "office" | "atmosphere";

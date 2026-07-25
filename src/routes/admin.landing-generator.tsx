@@ -111,7 +111,7 @@ const EMPTY: Branding = {
   landing_domain: "",
   api_endpoint: "",
   portal_url: "",
-  portal_theme: "minimal",
+  portal_theme: "clean",
 
   supabase_url: "",
   supabase_anon_key: "",
@@ -635,7 +635,7 @@ document.addEventListener('submit', function(e){
           hrb: b.hrb, registergericht: b.registergericht, ust_id: b.ust_id, steuernummer: b.steuernummer,
           geschaeftsfuehrer: b.geschaeftsfuehrer, impressum: b.impressum,
           api_endpoint: b.api_endpoint, portal_url: b.portal_url, tenant_id: b.tenant_id,
-          portal_theme: b.portal_theme || "minimal",
+          portal_theme: b.portal_theme || "clean",
 
           seo_title: b.seo_title, seo_description: b.seo_description, seo_image: b.seo_image,
           recruiter_name: b.recruiter_name || "Sabine Schneider",
@@ -669,7 +669,7 @@ document.addEventListener('submit', function(e){
       // Portal-Design auf den Tenant übertragen (nur Fast-Track hat ein Portal).
       if (branding.flow_type === "fast" && branding.tenant_id) {
         try {
-          await setPortalThemeFn({ data: { tenant_id: branding.tenant_id, portal_theme: branding.portal_theme || "minimal" } });
+          await setPortalThemeFn({ data: { tenant_id: branding.tenant_id, portal_theme: branding.portal_theme || "clean" } });
         } catch (e: any) {
           toast({
             title: "Portal-Design nicht übernommen",
