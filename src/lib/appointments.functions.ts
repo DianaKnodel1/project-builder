@@ -391,3 +391,18 @@ export const adminCancelAppointment = createServerFn({ method: "POST" })
       .eq("id", (appt as any).application_id);
     return { ok: true };
   });
+
+// Termin-Historie einer Bewerbung (alle Buchungen + Absagen)
+export const adminListAppointmentsForApplication = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ application_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { data: rows, error } = await context.supabase
+      .from("interview_appointments")
+      .select("id, starts_at, ends_at, status, cancelled_at, cancelled_by, cancel_reason, applicant_timezone, created_at")
+      .eq("application_id", data.application_id)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return { rows: rows ?? [] };
+  });
