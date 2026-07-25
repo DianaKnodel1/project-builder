@@ -36,6 +36,9 @@ const BrandingSchema = z.object({
   seo_title: z.string().max(320).default(""),
   seo_description: z.string().max(640).default(""),
   seo_image: z.string().max(500).default(""),
+  // Portal-Design (nur Fast-Track relevant) — steuert Login/Registrierung im Portal
+  portal_theme: z.enum(["classic", "minimal", "split", "soft"]).default("classic"),
+
 });
 
 const SaveInput = z.object({
