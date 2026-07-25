@@ -89,59 +89,46 @@ export function AdminEmailLogsPage() {
 
   const { paged, page, setPage, pageCount, rangeFrom, rangeTo, total } = usePagination(filtered, 100);
 
-  const resendEmail = async (log: EmailLog) => {
-    setResending(log.id);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-invitation-email", {
-        body: {
-          to: log.recipient_email,
-          fullName: log.metadata?.full_name || log.recipient_email,
-          firstName: log.metadata?.first_name,
-          lastName: log.metadata?.last_name,
-          registrationLink: log.metadata?.registration_link || window.location.origin,
-          tenantId: log.metadata?.tenant_id,
-        },
+  // Generischer Resend über die Edge Function `email-resend`:
+  // versendet das gespeicherte rendered_html erneut — für JEDEN Mail-Typ.
+  const doResend = async (log: EmailLogFull, opts: { to?: string; isTest?: boolean; force?: boolean } = {}) => {
+    const r = await resendEmailLog(log.id, opts);
+    if (r.ok) {
+      toast({
+        title: opts.isTest ? "Test-Mail verschickt" : "E-Mail erneut gesendet",
+        description: r.to ? `An ${r.to}` : undefined,
       });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      toast({ title: "E-Mail erneut gesendet" });
-      loadData();
-    } catch (err: any) {
-      toast({ title: "Fehler beim Versand", description: err.message, variant: "destructive" });
-    } finally {
-      setResending(null);
+      if (!opts.isTest) await loadData();
+      return true;
     }
+    if (r.code === "token_template") {
+      toast({
+        title: "Link abgelaufen",
+        description: "Diese E-Mail enthält einen zeitlich begrenzten Link. Bitte über den Bewerber-Datensatz einen frischen Link erzeugen.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    toast({ title: "Versand fehlgeschlagen", description: r.message, variant: "destructive" });
+    return false;
   };
 
-  // Testkopie an den eingeloggten Admin schicken (nur für Invitation-Mails sinnvoll,
-  // da nur dort die Edge-Function "send-invitation-email" alle Daten kennt).
+  const resendEmail = async (log: EmailLogFull) => {
+    setResending(log.id);
+    try { await doResend(log); } finally { setResending(null); setConfirmResend(null); }
+  };
+
+  // Testkopie an den eingeloggten Admin — funktioniert jetzt für alle Mail-Typen.
   const sendTestToMe = async (log: EmailLogFull) => {
     if (!user?.email) {
       toast({ title: "Keine Admin-E-Mail bekannt", variant: "destructive" });
       return;
     }
     setSendingTest(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-invitation-email", {
-        body: {
-          to: user.email,
-          fullName: log.metadata?.full_name || "Test Empfänger",
-          firstName: log.metadata?.first_name || "Test",
-          lastName: log.metadata?.last_name || "Empfänger",
-          registrationLink: log.metadata?.registration_link || window.location.origin,
-          tenantId: log.metadata?.tenant_id || log.tenant_id,
-          isTest: true,
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      toast({ title: "Test-Mail verschickt", description: `An ${user.email}` });
-    } catch (err: any) {
-      toast({ title: "Test-Versand fehlgeschlagen", description: err.message, variant: "destructive" });
-    } finally {
-      setSendingTest(false);
-    }
+    try { await doResend(log, { to: user.email, isTest: true, force: true }); }
+    finally { setSendingTest(false); }
   };
+
 
   const handleAckAll = async () => {
     setAcking(true);
