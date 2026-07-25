@@ -176,12 +176,14 @@ function AdminEmailCenterPage() {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="Gesamt" value={stats.total} icon={Mail} tone="muted" />
         <Kpi label="Versendet" value={stats.sent} icon={CheckCircle2} tone="emerald" />
         <Kpi label="Ausstehend" value={stats.pending} icon={Clock} tone="amber" />
+        <Kpi label="Übersprungen" value={stats.skipped} icon={Clock} tone="muted" />
         <Kpi label="Fehlgeschlagen" value={stats.failed} icon={XCircle} tone="rose" />
       </div>
+
 
       {/* Aktive Templates */}
       <Card>
