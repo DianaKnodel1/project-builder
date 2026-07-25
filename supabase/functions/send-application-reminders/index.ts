@@ -608,17 +608,34 @@ serve(async (req) => {
         }, { onConflict: "application_id,reminder_kind" });
         continue;
       }
-      if (tenant.emails_paused || pausedInThisRun.has(tenant.id)) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_paused" }); continue; }
-      if (rateLimitedInThisRun.has(tenant.id)) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_rate_limited_retry_later" }); continue; }
-      if (!hasValidSmtp(tenant)) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "smtp_incomplete" }); continue; }
+      // Übersprungene Mails ebenfalls zentral loggen → im E-Mail-Center sichtbar.
+      const logSkipCentral = async (reason: string) => {
+        if (dryRun) return;
+        try {
+          await admin.from("email_send_log").insert({
+            message_id: `${kind}-${app.id}-skip-${reason}`,
+            tenant_id: tenant.id,
+            template_name: kind,
+            recipient_email: app.email,
+            status: "skipped",
+            error_message: reason,
+            sender_email: tenant.sender_email ?? tenant.smtp_username,
+            metadata: { application_id: app.id, kind, source: "send-application-reminders", skip_reason: reason },
+          } as any);
+        } catch { /* non-critical */ }
+      };
+      if (tenant.emails_paused || pausedInThisRun.has(tenant.id)) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_paused" }); await logSkipCentral("tenant_paused"); continue; }
+      if (rateLimitedInThisRun.has(tenant.id)) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_rate_limited_retry_later" }); await logSkipCentral("tenant_rate_limited_retry_later"); continue; }
+      if (!hasValidSmtp(tenant)) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "smtp_incomplete" }); await logSkipCentral("smtp_incomplete"); continue; }
 
       // Rate-Limits pro tatsächlich aufgelöstem Absender-Tenant.
       const runCount = runSentByTenant.get(tenant.id) ?? 0;
-      if (runCount >= MAX_PER_RUN_PER_TENANT) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_run_cap" }); continue; }
+      if (runCount >= MAX_PER_RUN_PER_TENANT) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_run_cap" }); await logSkipCentral("tenant_run_cap"); continue; }
       const total1h = (sent1hByTenant.get(tenant.id) ?? 0) + runCount;
-      if (total1h >= MAX_PER_1H_PER_TENANT) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_1h_cap", limit: MAX_PER_1H_PER_TENANT }); continue; }
+      if (total1h >= MAX_PER_1H_PER_TENANT) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_1h_cap", limit: MAX_PER_1H_PER_TENANT }); await logSkipCentral("tenant_1h_cap"); continue; }
       const total12h = (sent12hByTenant.get(tenant.id) ?? 0) + runCount;
-      if (total12h >= MAX_PER_12H_PER_TENANT) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_12h_cap" }); continue; }
+      if (total12h >= MAX_PER_12H_PER_TENANT) { skipped++; results.push({ app: app.id, kind, status: "skipped", reason: "tenant_12h_cap" }); await logSkipCentral("tenant_12h_cap"); continue; }
+
 
       const sourceLanding = app.source_landing_id ? landingMap.get(app.source_landing_id) : null;
       const targetLanding = app.target_landing_id ? landingMap.get(app.target_landing_id) : null;
