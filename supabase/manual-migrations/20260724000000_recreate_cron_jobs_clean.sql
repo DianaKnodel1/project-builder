@@ -70,7 +70,7 @@ SELECT cron.schedule(
 
 SELECT cron.schedule(
   'send-application-reminders',
-  '*/30 * * * *',
+  '*/5 * * * *',
   $CRON$
   SELECT net.http_post(
     url := 'https://<SUPABASE_URL>/functions/v1/send-application-reminders',

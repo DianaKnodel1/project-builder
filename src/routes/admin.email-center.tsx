@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Mail, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle, Search, FileText, ScrollText, Pencil, RotateCcw,
 } from "lucide-react";
-import { dedupeEmailLogs, EMAIL_TYPE_LABELS, type EmailLog } from "@/lib/email-stats";
+import { EMAIL_TYPE_LABELS, type EmailLog } from "@/lib/email-stats";
 import { resendEmailLog, isTokenTemplate } from "@/lib/email-resend";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +22,8 @@ export const Route = createFileRoute("/admin/email-center")({
 /**
  * E-Mail-Center v2 — Reset & minimal.
  * Zeigt ausschließlich das, was der aktuelle Flow tatsächlich versendet.
- * Alles wird live aus email_send_log berechnet (dedupliziert per message_id).
+ * Alles wird live aus email_send_log berechnet. Nur technisch ersetzte
+ * Retry-Zeilen (superseded) werden ausgeblendet; echte Sendungen bleiben einzeln sichtbar.
  */
 
 // Aktive Templates im neuen Flow (Bewerbung -> Interview -> Onboarding).
@@ -67,8 +68,7 @@ function AdminEmailCenterPage() {
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5000);
-    // Gemeinsame Dedup-Logik mit dem Dashboard: ein Eintrag pro logischem Versand.
-    setRows(dedupeEmailLogs((data as Row[] | null) ?? []).filter(r => r.status !== "superseded"));
+    setRows(((data as Row[] | null) ?? []).filter(r => r.status !== "superseded"));
     setLoading(false);
   };
 
