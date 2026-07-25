@@ -152,6 +152,33 @@ function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
+// Zentrale Logs-Tabelle des E-Mail-Centers. Ohne diesen Insert taucht die
+// Resend-Bestätigungsmail nirgends im Admin-Center auf.
+async function logSend(admin: any, p: {
+  messageId: string; tenantId: string; to: string; subject: string; html: string;
+  senderEmail: string; status: "sent" | "failed"; error?: string;
+}) {
+  try {
+    await admin.from("email_send_log").insert({
+      message_id: p.messageId,
+      tenant_id: p.tenantId,
+      template_name: "signup_confirmation_resend",
+      recipient_email: p.to,
+      status: p.status,
+      error_message: p.error ?? null,
+      rendered_subject: p.subject,
+      rendered_html: p.html,
+      sender_email: p.senderEmail,
+      metadata: { source: "resend-signup-confirmation" },
+    });
+  } catch (e) {
+    console.warn("email_send_log insert skipped:", e);
+  }
+}
+
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
 // SMTP-Verify mit Smart-Pause: erst nach 3 aufeinander folgenden Fails wird
 // der Tenant auto-pausiert. Siehe migration 20260608110000_tenant_smtp_health.sql.
 async function verifyOrPause(admin: any, tenant: any, transporter: any): Promise<{ ok: boolean; reason?: string; paused?: boolean }> {
