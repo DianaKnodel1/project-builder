@@ -52,6 +52,8 @@ function RegisterPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const t = usePortalTheme().tokens;
+
 
   // SSR-safe: start with neutral defaults, hydrate from sessionStorage on the client.
   const [userId, setUserId] = useState<string | null>(null);
