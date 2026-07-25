@@ -7,7 +7,7 @@ export const Route = createFileRoute("/register")({
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import AuthShell from "@/components/auth/AuthShell";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { translateAuthError } from "@/lib/auth-errors";
@@ -448,13 +448,18 @@ function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/50 p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.03),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(var(--primary)/0.02),transparent_50%)]" />
+    <AuthShell
+      width="lg"
+      title={step === 99 ? "Fast geschafft!" : "Konto erstellen"}
+      description={
+        step === 99
+          ? undefined
+          : "Nur wenige Schritte bis zu deinem Zugang zum Mitarbeiter-Portal."
+      }
+    >
+      <div className="space-y-6">
+        {step !== 99 && <WizardProgress step={step} />}
 
-      <Card className="w-full max-w-lg animate-fade-in shadow-2xl border-0 bg-card/95 backdrop-blur-sm relative">
-        <CardContent className="pt-8 pb-8 px-8">
-          <WizardProgress step={step} />
 
           {step === 0 && (
             <StepAccount
@@ -493,53 +498,45 @@ function RegisterPage() {
               onNext={handleFinalSubmit} onBack={() => setStep(3)} loading={loading}
             />
           )}
-          {step === 99 && (
-            <div className="space-y-5 text-center py-4">
-              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
-                <svg className="h-7 w-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-2xl font-heading font-bold text-foreground">Fast geschafft!</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Wir haben dir eine Bestätigungs-E-Mail an <strong className="text-foreground">{email}</strong> geschickt.
-                  Klicke auf den Link in der Mail, um deinen Account zu aktivieren – danach landest du direkt im Dashboard.
-                </p>
-              </div>
+        {step === 99 && (
+          <div className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              Wir haben dir eine Bestätigungs-E-Mail an <strong className="text-foreground">{email}</strong> geschickt.
+              Klicke auf den Link in der Mail, um deinen Account zu aktivieren – danach landest du direkt im Dashboard.
+            </p>
 
-              <div className="rounded-xl border border-border bg-muted/30 p-4 text-left text-xs text-muted-foreground space-y-2">
-                <p className="font-semibold text-foreground">Nächste Schritte im Mitarbeiter-Portal:</p>
-                <ul className="space-y-1.5 list-disc list-inside">
-                  <li>Arbeitsvertrag digital unterschreiben</li>
-                  <li>Personalausweis hochladen (Verifizierung)</li>
-                  <li>Steuer-ID, Sozialversicherungs­nummer & IBAN ergänzen</li>
-                </ul>
-                <p className="pt-2">Dein Teamleiter begleitet dich dabei per Chat.</p>
-              </div>
-              <div className="space-y-2">
-                <button
-                  onClick={handleResendConfirmation}
-                  disabled={resending || resendCooldown > 0}
-                  className="w-full h-11 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-muted/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {resending
-                    ? "Wird gesendet…"
-                    : resendCooldown > 0
-                      ? `Erneut senden in ${resendCooldown}s`
-                      : "Keine E-Mail erhalten? Erneut senden"}
-                </button>
-                <button
-                  onClick={() => { resetWizard(); navigate("/login"); }}
-                  className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Zum Login
-                </button>
-              </div>
+            <div className="rounded-xl border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-2">
+              <p className="font-semibold text-foreground">Nächste Schritte im Mitarbeiter-Portal:</p>
+              <ul className="space-y-1.5 list-disc list-inside">
+                <li>Arbeitsvertrag digital unterschreiben</li>
+                <li>Personalausweis hochladen (Verifizierung)</li>
+                <li>Steuer-ID, Sozialversicherungs­nummer & IBAN ergänzen</li>
+              </ul>
+              <p className="pt-2">Dein Teamleiter begleitet dich dabei per Chat.</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            <div className="space-y-2">
+              <button
+                onClick={handleResendConfirmation}
+                disabled={resending || resendCooldown > 0}
+                className="w-full h-11 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-muted/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {resending
+                  ? "Wird gesendet…"
+                  : resendCooldown > 0
+                    ? `Erneut senden in ${resendCooldown}s`
+                    : "Keine E-Mail erhalten? Erneut senden"}
+              </button>
+              <button
+                onClick={() => { resetWizard(); navigate("/login"); }}
+                className="w-full h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Zum Login
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </AuthShell>
+
   );
 }
