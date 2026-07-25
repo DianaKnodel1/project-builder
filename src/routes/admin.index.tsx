@@ -76,8 +76,9 @@ function EmailMonitorWidget() {
           </div>
           <div className={`text-center p-3 rounded-lg border ${stats.pending > 0 ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/40" : "bg-muted/60 border-border"}`}>
             <p className={`text-lg font-bold ${stats.pending > 0 ? "text-amber-700 dark:text-amber-300" : "text-foreground"}`}>{stats.pending}</p>
-            <p className={`text-[10px] font-medium ${stats.pending > 0 ? "text-amber-700/80 dark:text-amber-300/80" : "text-muted-foreground"}`}>In Warteschlange</p>
+            <p className={`text-[10px] font-medium ${stats.pending > 0 ? "text-amber-700/80 dark:text-amber-300/80" : "text-muted-foreground"}`}>Retry offen</p>
           </div>
+
           <div className={`text-center p-3 rounded-lg border ${stats.failed > 0 ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/40" : "bg-muted/60 border-border"}`}>
             <div className="flex items-center justify-center gap-1">
               {stats.failed > 0 ? <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" /> : null}
