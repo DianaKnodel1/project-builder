@@ -176,9 +176,8 @@ export const Route = createFileRoute("/api/public/calendly-webhook")({
         if (event === "invitee.created" && !magicToken) {
           magicToken = crypto.randomUUID() + "-" + crypto.randomUUID().slice(0, 8);
         }
-        const expiresAt = event === "invitee.created"
-          ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-          : null;
+        // Magic-Links für Bewerber laufen bewusst NICHT ab.
+        const expiresAt = null;
 
         if (newStatus) {
           const upd: any = {

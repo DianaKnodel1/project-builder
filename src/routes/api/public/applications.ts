@@ -378,7 +378,7 @@ export const Route = createFileRoute("/api/public/applications")({
               token = crypto.randomUUID().replace(/-/g, "");
               await supabaseAdmin.from("applications").update({
                 magic_token: token,
-                magic_token_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60_000).toISOString(),
+                magic_token_expires_at: null,
                 booking_status: "pending",
               } as any).eq("id", appId);
             }
