@@ -92,6 +92,14 @@ function EmailMonitorWidget() {
           </div>
         </div>
 
+        {stats.stalePending > 0 && (
+          <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-900/50">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              {stats.stalePending} E-Mail(s) hängen seit über 6 Stunden im Retry
+            </p>
+          </div>
+        )}
 
         {stats.actionRequired && (
           <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-900/50">
@@ -101,6 +109,7 @@ function EmailMonitorWidget() {
             </p>
           </div>
         )}
+
       </CardContent>
     </Card>
   );
