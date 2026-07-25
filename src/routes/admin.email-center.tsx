@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import {
   Mail, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle, Search, FileText, ScrollText, Pencil,
 } from "lucide-react";
+import { dedupeEmailLogs, type EmailLog } from "@/lib/email-stats";
+
 
 
 export const Route = createFileRoute("/admin/email-center")({
