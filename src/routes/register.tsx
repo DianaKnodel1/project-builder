@@ -448,12 +448,17 @@ function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/50 p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.03),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(var(--primary)/0.02),transparent_50%)]" />
+    <div className={t.wizardPage}>
+      {t.decor === "glow" && (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,hsl(var(--primary)/0.10),transparent_55%)] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_85%,hsl(var(--primary)/0.06),transparent_55%)] pointer-events-none" />
+        </>
+      )}
 
-      <Card className="w-full max-w-lg animate-fade-in shadow-2xl border-0 bg-card/95 backdrop-blur-sm relative">
+      <Card className={t.wizardCard}>
         <CardContent className="pt-8 pb-8 px-8">
+
           <WizardProgress step={step} />
 
           {step === 0 && (
