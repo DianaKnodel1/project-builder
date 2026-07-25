@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Mail, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle, Search, FileText, ScrollText, Pencil,
+  Mail, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle, Search, FileText, ScrollText, Pencil, RotateCcw,
 } from "lucide-react";
-import { dedupeEmailLogs, type EmailLog } from "@/lib/email-stats";
+import { dedupeEmailLogs, EMAIL_TYPE_LABELS, type EmailLog } from "@/lib/email-stats";
+import { resendEmailLog, isTokenTemplate } from "@/lib/email-resend";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 
 
@@ -50,13 +53,16 @@ function AdminEmailCenterPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<"24h" | "7d" | "30d">("7d");
   const [q, setQ] = useState("");
+  const [confirmResend, setConfirmResend] = useState<Row | null>(null);
+  const [resending, setResending] = useState(false);
+  const { toast } = useToast();
 
   const load = async () => {
     setLoading(true);
     const since = new Date(Date.now() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 86400_000).toISOString();
     const { data } = await supabase
       .from("email_send_log")
-      .select("id,message_id,template_name,recipient_email,status,error_message,metadata,created_at,acknowledged_at")
+      .select("id,message_id,template_name,recipient_email,status,error_message,metadata,created_at,acknowledged_at,rendered_html")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5000);
@@ -66,6 +72,21 @@ function AdminEmailCenterPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [range]);
+
+  const doResend = async (row: Row) => {
+    setResending(true);
+    const r = await resendEmailLog(row.id);
+    setResending(false);
+    setConfirmResend(null);
+    if (r.ok) {
+      toast({ title: "E-Mail erneut gesendet", description: r.to ? `An ${r.to}` : undefined });
+      load();
+    } else if (r.code === "token_template") {
+      toast({ title: "Link abgelaufen", description: "Diese E-Mail enthält einen zeitlich begrenzten Link — bitte über den Bewerber-Datensatz neu erzeugen.", variant: "destructive" });
+    } else {
+      toast({ title: "Versand fehlgeschlagen", description: r.message, variant: "destructive" });
+    }
+  };
 
   const stats = useMemo(() => {
     const s = { total: rows.length, sent: 0, failed: 0, pending: 0 };
@@ -238,6 +259,11 @@ function AdminEmailCenterPage() {
                     {r.error_message && <div className="text-rose-600 truncate">{r.error_message}</div>}
                   </div>
                   <div className="text-[10px] text-muted-foreground shrink-0">{new Date(r.created_at).toLocaleString("de-DE")}</div>
+                  {canResendRow(r) && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" title="Erneut senden" onClick={() => setConfirmResend(r)}>
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -263,6 +289,7 @@ function AdminEmailCenterPage() {
                   <th className="text-left px-4 py-2 font-medium text-muted-foreground">Empfänger</th>
                   <th className="text-left px-4 py-2 font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-2 font-medium text-muted-foreground">Wann</th>
+                  <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -272,18 +299,53 @@ function AdminEmailCenterPage() {
                     <td className="px-4 py-1.5 text-muted-foreground">{r.recipient_email}</td>
                     <td className="px-4 py-1.5"><StatusBadge status={r.status} /></td>
                     <td className="px-4 py-1.5 text-[10px] text-muted-foreground tabular-nums">{new Date(r.created_at).toLocaleString("de-DE")}</td>
+                    <td className="px-2 py-1.5">
+                      {canResendRow(r) && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Erneut senden" onClick={() => setConfirmResend(r)}>
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">Nichts zu sehen.</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Nichts zu sehen.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Bestätigung: generischer Resend */}
+      <Dialog open={!!confirmResend} onOpenChange={(open) => !open && setConfirmResend(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>E-Mail erneut senden?</DialogTitle>
+            <DialogDescription>
+              {confirmResend && (
+                <>
+                  „{EMAIL_TYPE_LABELS[confirmResend.template_name] ?? confirmResend.template_name}“ geht erneut an{" "}
+                  <strong>{confirmResend.recipient_email}</strong> — mit exakt dem gespeicherten Inhalt vom{" "}
+                  {new Date(confirmResend.created_at).toLocaleString("de-DE")}.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setConfirmResend(null)}>Abbrechen</Button>
+            <Button size="sm" className="gap-1.5" disabled={resending} onClick={() => confirmResend && doResend(confirmResend)}>
+              <RotateCcw className={`h-3.5 w-3.5 ${resending ? "animate-spin" : ""}`} /> Jetzt senden
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function canResendRow(r: Row): boolean {
+  return !!r.rendered_html && !isTokenTemplate(r.template_name);
 }
 
 function relativeTime(iso: string): string {

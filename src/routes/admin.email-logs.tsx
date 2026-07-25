@@ -64,7 +64,7 @@ export function AdminEmailLogsPage() {
         supabase
           .from("email_send_log")
           .select("*")
-          .neq("status", "pending")
+          .neq("status", "superseded")
           .gte("created_at", since)
           .order("created_at", { ascending: false }),
       );
