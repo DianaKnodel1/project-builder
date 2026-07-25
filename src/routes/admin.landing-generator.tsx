@@ -13,6 +13,10 @@ import {
 import { listPartnerCompanies } from "@/lib/partner-companies.functions";
 import { THEME_LIST, THEMES } from "@/lib/landing-themes";
 import { THEME_ASSETS } from "@/lib/theme-assets.generated";
+import { PORTAL_THEMES, type PortalThemeId } from "@/lib/portal-themes";
+import { setTenantPortalTheme } from "@/lib/portal-theme.functions";
+import PortalThemePreview from "@/components/admin/PortalThemePreview";
+
 
 const ASSET_MIME: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
@@ -60,6 +64,8 @@ type Branding = {
   landing_domain: string;
   api_endpoint: string;
   portal_url: string;
+  portal_theme: PortalThemeId;
+
   supabase_url: string;
   supabase_anon_key: string;
   tenant_id: string;
@@ -105,6 +111,8 @@ const EMPTY: Branding = {
   landing_domain: "",
   api_endpoint: "",
   portal_url: "",
+  portal_theme: "classic",
+
   supabase_url: "",
   supabase_anon_key: "",
   tenant_id: "",
