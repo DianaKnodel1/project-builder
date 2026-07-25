@@ -176,8 +176,7 @@ async function logSend(admin: any, p: {
   }
 }
 
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
+
 
 // SMTP-Verify mit Smart-Pause: erst nach 3 aufeinander folgenden Fails wird
 // der Tenant auto-pausiert. Siehe migration 20260608110000_tenant_smtp_health.sql.
