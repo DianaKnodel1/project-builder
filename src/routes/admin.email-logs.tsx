@@ -424,7 +424,7 @@ export function AdminEmailLogsPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {previewLog?.template_name === "invitation" && user?.email && (
+            {previewLog?.rendered_html && user?.email && (
               <Button
                 variant="outline"
                 size="sm"
@@ -435,13 +435,53 @@ export function AdminEmailLogsPage() {
                 <Send className="h-3.5 w-3.5" /> Test an mich senden ({user.email})
               </Button>
             )}
+            {previewLog && previewLog.rendered_html && !isTokenTemplate(previewLog.template_name) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => { const l = previewLog; setPreviewLog(null); setConfirmResend(l); }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Erneut senden
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setPreviewLog(null)}>Schließen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bestätigung für generischen Resend */}
+      <Dialog open={!!confirmResend} onOpenChange={(open) => !open && setConfirmResend(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>E-Mail erneut senden?</DialogTitle>
+            <DialogDescription>
+              {confirmResend && (
+                <>
+                  „{EMAIL_TYPE_LABELS[confirmResend.template_name] ?? confirmResend.template_name}“ geht erneut an{" "}
+                  <strong>{confirmResend.recipient_email}</strong>. Es wird exakt der gespeicherte Inhalt
+                  von {new Date(confirmResend.created_at).toLocaleString("de-DE")} verschickt.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setConfirmResend(null)}>Abbrechen</Button>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              disabled={!!resending}
+              onClick={() => confirmResend && resendEmail(confirmResend)}
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${resending ? "animate-spin" : ""}`} /> Jetzt senden
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
