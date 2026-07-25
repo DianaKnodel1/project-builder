@@ -41,7 +41,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "password_reset",                   label: "Passwort zurücksetzen",        group: "Auth",       trigger: "User löst Reset aus" },
 ];
 
-type Row = { message_id: string; template_name: string; recipient_email: string; status: string; error_message: string | null; created_at: string };
+type Row = EmailLog;
 
 function AdminEmailCenterPage() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -54,20 +54,12 @@ function AdminEmailCenterPage() {
     const since = new Date(Date.now() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 86400_000).toISOString();
     const { data } = await supabase
       .from("email_send_log")
-      .select("message_id,template_name,recipient_email,status,error_message,created_at")
+      .select("id,message_id,template_name,recipient_email,status,error_message,metadata,created_at,acknowledged_at")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5000);
-    // Dedup per message_id (neueste Zeile gewinnt)
-    const seen = new Set<string>();
-    const dedup: Row[] = [];
-    for (const r of (data as Row[] | null) ?? []) {
-      const key = r.message_id || `${r.template_name}:${r.recipient_email}:${r.created_at}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      dedup.push(r);
-    }
-    setRows(dedup);
+    // Gemeinsame Dedup-Logik mit dem Dashboard: ein Eintrag pro logischem Versand.
+    setRows(dedupeEmailLogs((data as Row[] | null) ?? []).filter(r => r.status !== "superseded"));
     setLoading(false);
   };
 
@@ -95,6 +87,7 @@ function AdminEmailCenterPage() {
     }
     return m;
   }, [rows]);
+
 
   // Wie viele der aktiven Kettenschritte hatten im Zeitraum mind. einen Versand?
   const coverage = useMemo(() => {
