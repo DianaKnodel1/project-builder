@@ -1,48 +1,94 @@
-## Teil 1 — Portal-Designs überarbeiten
+## Ziel
 
-Richtung: schlicht wie Bild 2 (Minimal), aber wertiger. Trust-Zeile („Sicherer Login · DSGVO-orientiert · 100% online") wird komplett entfernt.
+Drei professionelle, schlichte Portal-Designs für Login und Registrierung erstellen, direkt als echte Screenshots zeigen und gleichzeitig das gesamte E-Mail-System samt Mail Center vor dem Massenversand technisch und praktisch absichern.
 
-Neue Design-Auswahl (4 Varianten, gleiche Formulare, nur Rahmen/Optik):
+## Bestätigter aktueller Stand
 
-1. **Minimal** — weiße, zentrierte Karte auf neutralem Grund. Logo klein oben links in der Kopfzeile statt zentriert über der Karte. Keine Effekte.
-2. **Marken-Split** — links Markenfläche (Logo oben links, Firmenname, ein kurzer Satz), rechts das Formular. Hell, ruhig.
-3. **Theme-Bild** — großflächiges Hintergrundbild (Branchen-/Theme-Bild), darüber leichter Abdunkler und die schlichte weiße Karte. Logo oben links über dem Bild.
-4. **Soft** — dezenter Verlauf in der Firmenfarbe, abgerundete Karte. Bleibt als weichere Alternative.
+- Der alte Wert von **8 Bewerber-Remindern pro Lauf ist bereits geändert**.
+- Aktuell gelten **60 Mails pro Lauf und Tenant**. Bei zwei Läufen pro Stunde sind das bis zu 120 Reminder/Stunde; zusätzlich greifen die zentralen Grenzen von **150/Stunde** und **2.400/Tag je Tenant/SMTP**.
+- Die vier derzeit im Code vorhandenen Portal-Varianten sind `Minimal`, `Marken-Split`, `Theme-Bild` und `Soft`.
+- „Theme-Bild“ bedeutet: Ein professionelles Büro-/Branchenfoto füllt den Hintergrund, wird leicht abgedunkelt und dezent unscharf dargestellt. Das Firmenlogo steht links oben; das weiße, schlichte Formular bleibt klar lesbar im Mittelpunkt.
+- Das Mail Center basiert auf dem zentralen Versandlog. Ein Status `gesendet` bestätigt derzeit die Annahme durch den SMTP-Server, aber nicht zwingend die spätere Zustellung im Postfach. Späte Bounces oder Spam-Zustellungen können ohne Rückkanal nicht sicher erkannt werden.
 
-Weitere Anpassungen:
-- Kopfzeile einheitlich: Logo links, optional Firmenname; Fallback-Icon nur wenn kein Logo hinterlegt ist.
-- Fußzeile schlicht: Impressum/Datenschutz-Links statt Trust-Badges.
-- „Classic (Dunkel)" fliegt aus der Auswahl (Wellen-Grafik wirkt unruhig); bestehende Tenants ohne Auswahl landen auf **Minimal**.
-- Hintergrundbild pro Tenant: entweder eigenes Bild (URL/Upload) oder ein neutrales Standardbild aus dem Projekt.
-- Vorschau-Seite `/portal-designs` und der Design-Picker im Landing-Generator werden auf die neuen Varianten aktualisiert.
+## 1. Drei Portal-Designs
 
-Danach zeige ich alle Varianten wieder als Screenshots zur Abnahme.
+Alle drei Varianten erhalten dieselben Formulare und Funktionen, unterscheiden sich nur in der Darstellung:
 
-## Teil 2 — E-Mail-System-Audit (vor dem Massenversand)
+1. **Office Focus**
+   - Zentriertes weißes Login-Formular
+   - Professionelles Bürobild vollflächig im Hintergrund
+   - Leichter Blur und dunkler Overlay für gute Lesbarkeit
+   - Firmenlogo links oben
 
-Beim Durchsehen des Codes sind vier Punkte aufgefallen, die beim Hochskalieren stören:
+2. **Clean Corporate**
+   - Sehr heller, neutraler Hintergrund ohne Foto
+   - Kompakte, hochwertige Formularkarte in der Mitte
+   - Firmenfarbe nur für Button, Fokus und kleine Akzente
+   - Firmenlogo links oben
 
-**a) Durchsatz-Bremsen, die nicht zum 150/h-Vertrag passen**
-- Bewerber-Reminder: max. 8 Mails pro Lauf und Tenant, Cron alle 30 Min → nur ~16 Mails/Stunde statt möglicher 150.
-- Invite-Nachfass-Queue: eigenes, fest verdrahtetes Tageslimit von 140 Mails/Tenant — zieht nicht die zentralen Limits (2.400/Tag).
-- Fix: beide auf die zentralen Werte in der Limit-Datei umstellen und die Lauf-Kontingente so setzen, dass 150/h/Tenant tatsächlich erreichbar sind, ohne die Stundengrenze zu reißen.
+3. **Brand Atmosphere**
+   - Unscharfes Büro-/Arbeitsweltbild mit einer ruhigen Fläche in der Tenant-Firmenfarbe
+   - Zentrierte weiße Formularkarte
+   - Etwas weicher als Clean Corporate, aber weiterhin professionell und ohne dekorativen Schnickschnack
 
-**b) Lücken im Tracking / Mail-Center**
-- Bei Termin-Erinnerungen werden Skip-Gründe (keine E-Mail, kein Token, SMTP unvollständig, Tenant pausiert, keine Domain) nur in der Antwort zurückgegeben, aber nicht ins zentrale Log geschrieben → im Mail-Center unsichtbar.
-- Fix: jede Entscheidung (sent / failed / skipped mit Grund) wird in allen Versandfunktionen ins zentrale Log geschrieben, mit Template-Name, Empfänger, Tenant und Grund.
+Die bisherige Split-Variante wird nicht weiter ausgebaut, weil die gewünschte Grundkomposition **zentriert und minimal** ist. Bestehende Tenant-Einstellungen werden sicher auf eine passende neue Variante abgebildet.
 
-**c) Einheitliche Log-Schreibweise**
-Jede Funktion hat ihre eigene Log-Routine, teils mit unterschiedlichen Feldern (Template-Name, Message-ID, gerenderte HTML fehlt teils). Fix: eine gemeinsame Log-Hilfsfunktion im geteilten Ordner, die alle Funktionen nutzen — damit sind Statistik, Erneut-Senden (braucht das gespeicherte HTML) und Coverage-Monitor für jede Mail zuverlässig.
+## 2. Vorschau und Auswahl
 
-**d) Verifikation statt Vermutung**
-- Prüfung der aktiven Cron-Jobs auf dem Backend (welche Jobs laufen wirklich, in welchem Intervall) — ein Job für Termin-Erinnerungen wurde in einer Migration abgeschaltet und muss bewertet werden.
-- Abgleich in der Datenbank: alle Template-Namen der letzten 7 Tage im Log gegen die im Mail-Center freigeschalteten Namen; alle Log-Einträge ohne gespeichertes HTML (nicht erneut sendbar) auflisten.
-- Kompletter Trockenlauf aller Flows (dry-run) plus ein echter Durchlauf der 14-Schritt-Kette mit einer Testadresse, danach Kontrolle: erscheint jede der 14 Mails im Mail-Center mit korrektem Status.
+- Die Vorschauseite `/portal-designs` stabilisieren und alle drei Varianten dort vollständig durchschaltbar machen.
+- Den Design-Picker im Fast-Track-Landing-Generator auf dieselben drei Designs aktualisieren.
+- Tenant-Logo und optionales eigenes Hintergrundbild verwenden; ohne eigenes Bild greift ein professionelles Standard-Bürobild aus dem Projekt.
+- Desktop- und Mobilansicht prüfen.
+- Anschließend echte Screenshots aller drei Designs zur Abnahme zeigen.
 
-Ergebnis: eine kurze Freigabe-Checkliste (Durchsatz pro Tenant/Stunde, Tracking-Lücken = 0, alle 14 Templates sichtbar, Fehler-Wiederholung funktioniert).
+## 3. E-Mail-System vollständig prüfen und vereinheitlichen
 
-## Technische Details
+- Sämtliche Versandwege inventarisieren und gegen die zentrale Limit-Konfiguration prüfen.
+- Verbleibende lokale oder fest codierte Limits entfernen, sofern sie den zentralen 150/Stunde- und 2.400/Tag-Regeln widersprechen.
+- Für jeden Versandweg sicherstellen, dass jede Entscheidung zentral protokolliert wird:
+  - gesendet
+  - fehlgeschlagen
+  - übersprungen, inklusive verständlichem Grund
+  - erneut gesendet
+  - dauerhaft unterdrückt beziehungsweise gebounced
+- Einheitliche Felder erzwingen: Tenant, Empfänger, Template-Name, Betreff, gerendertes HTML, Message-ID, Status, Fehler-/Skip-Grund und Zeitstempel.
+- Retry- und Resend-Verhalten kontrollieren, damit alte Fehlversuche nicht als offene Warteschlange doppelt gezählt werden.
+- Mail-Center-Whitelist und Template-Aliase gegen alle real versendeten Template-Namen abgleichen.
+- Kennzahlen so benennen, dass `gesendet` als „vom Mailserver angenommen“ verständlich ist und nicht fälschlich als garantierte Zustellung erscheint.
+- Prüfen, ob für späte Bounces ein verlässlicher Rückkanal des eingesetzten Mailservers verfügbar ist; falls nicht, diese technische Grenze im Mail Center klar kennzeichnen statt eine nicht messbare Zustellung vorzutäuschen.
 
-- Design: `src/lib/portal-themes.ts` (Token-Sets neu), `src/components/portal/PortalAuthShell.tsx` (Kopfzeile, Trust-Zeile entfernen, Bild-Layer), `src/routes/portal-designs.tsx`, `src/routes/admin.landing-generator.tsx`, ggf. Feld für Hintergrundbild in den Branding-Daten.
-- E-Mail: `supabase/functions/_shared/limits.ts`, neue `_shared/log-send.ts`, Anpassung in `send-application-reminders`, `send-appointment-reminders`, `send-booking-confirmation`, `send-invitation-email`, `send-reminders`, `send-chat-reminder`, `send-password-reset`, `resend-signup-confirmation`, `process-invite-resend-queue`; Whitelist/Coverage in `src/routes/admin.email-center.tsx`.
-- Deployment: Edge-Functions und ggf. Cron-Migration müssen auf Backend 123 ausgerollt werden (Ablauf steht im Runbook).
+## 4. Praktische Verifikation vor dem Massenversand
+
+- Aktive Cron-Jobs und tatsächliche Intervalle auf dem Backend prüfen.
+- Datenbankabgleich der letzten sieben Tage:
+  - alle Template-Namen
+  - fehlende Log-Einträge
+  - Einträge ohne gespeichertes HTML
+  - hängen gebliebene Retry-/Pending-Zustände
+  - doppelte logische Versandversuche
+- Isolierten Dry-Run aller automatischen Flows durchführen.
+- Danach die vorhandene 14-Schritt-Testkette mit einer freigegebenen Testadresse ausführen.
+- Im Mail Center kontrollieren, dass alle 14 Schritte mit korrektem Tenant, Template, Empfänger und Status sichtbar sind.
+- Stundenlimit während des Tests berücksichtigen, damit ein SMTP-Limit nicht mit einem Softwarefehler verwechselt wird.
+
+## 5. Aktualisierung und Deployment
+
+- Erst Frontend und Backend lokal beziehungsweise in der Vorschau prüfen.
+- Danach die betroffenen Backend-Funktionen und das Frontend über die vorhandenen Deployment-Abläufe aktualisieren.
+- Nach dem Deployment nochmals prüfen:
+  - Portal-Designauswahl speichert korrekt
+  - alle drei Designs laden auf Login und Registrierung
+  - Cron-Jobs laufen
+  - Testmail erscheint im Mail Center
+  - Retry/Resend funktioniert
+  - keine neuen Laufzeit-, Netzwerk- oder Buildfehler
+
+## Abnahme
+
+Die Umsetzung gilt erst als abgeschlossen, wenn:
+
+- alle drei Portal-Designs als Screenshots vorliegen,
+- 8 Mails/Lauf nirgends mehr wirksam sind,
+- jede der 14 Testmails im Mail Center nachvollziehbar ist,
+- Tracking-Lücken und Einträge ohne erneut sendbares HTML aufgeführt oder behoben sind,
+- Frontend und Backend aktualisiert wurden und der Nachtest erfolgreich war.

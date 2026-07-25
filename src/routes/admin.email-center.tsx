@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Mail, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle, Search, FileText, ScrollText, Pencil, RotateCcw,
 } from "lucide-react";
-import { dedupeEmailLogs, EMAIL_TYPE_LABELS, type EmailLog } from "@/lib/email-stats";
+import { EMAIL_TYPE_LABELS, type EmailLog } from "@/lib/email-stats";
 import { resendEmailLog, isTokenTemplate } from "@/lib/email-resend";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +22,8 @@ export const Route = createFileRoute("/admin/email-center")({
 /**
  * E-Mail-Center v2 — Reset & minimal.
  * Zeigt ausschließlich das, was der aktuelle Flow tatsächlich versendet.
- * Alles wird live aus email_send_log berechnet (dedupliziert per message_id).
+ * Alles wird live aus email_send_log berechnet. Nur technisch ersetzte
+ * Retry-Zeilen (superseded) werden ausgeblendet; echte Sendungen bleiben einzeln sichtbar.
  */
 
 // Aktive Templates im neuen Flow (Bewerbung -> Interview -> Onboarding).
@@ -42,6 +43,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "reminder_complete_registration",   label: "Onboarding (Perso/Vertrag)",   group: "Reminder",   trigger: "Nach Registrierung ohne KYC/Vertrag" },
   { key: "email_confirmation", keys: ["signup_confirmation", "signup_confirmation_resend", "reminder_confirm_email"], label: "E-Mail bestätigen", group: "Reminder", trigger: "Registrierung, erneutes Senden + Reminder bei unbestätigter Mail" },
   { key: "reminder_no_recent_booking",       label: "Keine Buchung (7 Tage)",       group: "Reminder",   trigger: "1 Reminder nach 7 Tagen ohne Auftragsbuchung" },
+  { key: "reminder_domain_recovery", keys: ["reminder_domain_recovery", "domain_recovery"], label: "Domain-Recovery", group: "Reminder", trigger: "Nach Wiederherstellung eines pausierten Tenant-Versands" },
   { key: "chat_reminder",                    label: "Chat-Reminder (manuell)",      group: "Support",    trigger: "Wird vom Admin manuell ausgelöst" },
   { key: "password_reset",                   label: "Passwort zurücksetzen",        group: "Auth",       trigger: "User löst Reset aus" },
 ];
@@ -66,8 +68,7 @@ function AdminEmailCenterPage() {
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5000);
-    // Gemeinsame Dedup-Logik mit dem Dashboard: ein Eintrag pro logischem Versand.
-    setRows(dedupeEmailLogs((data as Row[] | null) ?? []).filter(r => r.status !== "superseded"));
+    setRows(((data as Row[] | null) ?? []).filter(r => r.status !== "superseded"));
     setLoading(false);
   };
 
@@ -399,6 +400,7 @@ function StatusBadge({ status }: { status: string }) {
     failed:     "bg-rose-100 text-rose-700",
     bounced:    "bg-rose-100 text-rose-700",
     suppressed: "bg-slate-200 text-slate-700",
+    skipped:    "bg-muted text-muted-foreground",
   };
   return <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium ${map[status] ?? "bg-muted text-muted-foreground"}`}>{status}</span>;
 }

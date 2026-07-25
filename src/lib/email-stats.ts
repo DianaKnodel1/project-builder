@@ -21,6 +21,7 @@ export const EMAIL_STATUS_COLORS: Record<string, string> = {
   bounced: "bg-destructive text-destructive-foreground border border-destructive font-semibold",
   complained: "bg-status-pending/20 text-status-pending border border-status-pending/30 font-medium",
   suppressed: "bg-status-pending/20 text-status-pending border border-status-pending/30 font-medium",
+  skipped: "bg-muted text-muted-foreground border border-border font-medium",
 };
 
 export const EMAIL_STATUS_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ export const EMAIL_STATUS_LABELS: Record<string, string> = {
   bounced: "Gebounced",
   complained: "Beschwerde",
   suppressed: "Unterdrückt",
+  skipped: "Übersprungen",
 };
 
 export const EMAIL_TYPE_LABELS: Record<string, string> = {
@@ -47,6 +49,7 @@ export const EMAIL_TYPE_LABELS: Record<string, string> = {
   reminder_complete_registration: "Reminder · Onboarding",
   reminder_no_recent_booking: "Reminder · Keine Buchung",
   reminder_domain_recovery: "Reminder · Domain-Recovery",
+  domain_recovery: "Reminder · Domain-Recovery",
   bewerbung_magic_link: "Vermittlung · Interview-Einladung",
   booking_confirmation: "Vermittlung · Terminbestätigung",
   signup_confirmation: "E-Mail bestätigen",
@@ -90,13 +93,14 @@ const STATUS_PRIORITY: Record<string, number> = {
   bounced: 5,
   complained: 5,
   suppressed: 4,
+  skipped: 1,
   dlq: 3,
   failed: 2,
   superseded: 1,
   pending: 0,
 };
 
-const FINAL_STATUSES = new Set(["sent", "failed", "dlq", "bounced", "complained", "suppressed"]);
+const FINAL_STATUSES = new Set(["sent", "failed", "dlq", "bounced", "complained", "suppressed", "skipped"]);
 
 /**
  * Logischer Schlüssel eines Versands: Tenant + Template + Empfänger + Tag.

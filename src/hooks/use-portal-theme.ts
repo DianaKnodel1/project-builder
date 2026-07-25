@@ -12,5 +12,5 @@ export function usePortalTheme(): PortalTheme {
   if (typeof window !== "undefined") {
     override = new URLSearchParams(window.location.search).get("portal_theme");
   }
-  return getPortalTheme(override ?? (tenant as any)?.portal_theme ?? null);
+  return getPortalTheme(override ?? tenant?.portal_theme ?? null);
 }

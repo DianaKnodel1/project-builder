@@ -546,7 +546,7 @@ serve(async (req) => {
 
     // ─── Rate-Limits (SMTP-Reputationsschutz) ───
     // Neuer SMTP-Vertrag: 150 Mails/h pro Tenant/Sender, Sendefenster 6–22 Uhr.
-    // 12h-Cap = 12 × 150 = 1800. Cron läuft alle 30 Min → RUN-Cap moderat auf 8.
+    // 12h-Cap = 12 × 150 = 1800. Cron läuft alle 5 Min → RUN-Cap 10 (max. 120/h).
     const MAX_PER_RUN_PER_TENANT = LIMIT_RUN;
     const MAX_PER_1H_PER_TENANT = LIMIT_1H;
     const MAX_PER_12H_PER_TENANT = LIMIT_12H;

@@ -28,6 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastCheckedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (window.location.pathname === "/portal-designs") {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     const checkAdminRole = async (userId: string): Promise<boolean> => {

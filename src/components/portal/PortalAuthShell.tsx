@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { useTenant } from "@/contexts/TenantContext";
 import { usePortalTheme } from "@/hooks/use-portal-theme";
-import { DEFAULT_PORTAL_BACKGROUND } from "@/lib/portal-themes";
+import { getPortalTheme, type PortalThemeId } from "@/lib/portal-themes";
+import officeBackground from "@/assets/portal-office-focus.jpg";
+import atmosphereBackground from "@/assets/portal-brand-atmosphere.jpg";
 
 /**
  * Gemeinsamer Rahmen für die Auth-Seiten des Portals.
@@ -14,20 +16,24 @@ export default function PortalAuthShell({
   children,
   footer,
   width = "md",
+  themeId,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
   width?: "md" | "lg";
+  themeId?: PortalThemeId;
 }) {
   const { tenant } = useTenant();
-  const theme = usePortalTheme();
+  const activeTheme = usePortalTheme();
+  const theme = themeId ? getPortalTheme(themeId) : activeTheme;
   const t = theme.tokens;
   const name = tenant?.name ?? "Mitarbeiter-Portal";
   const maxW = width === "lg" ? "max-w-lg" : "max-w-md";
-  const onImage = theme.id === "image";
-  const bgUrl = (tenant as any)?.portal_background_url || DEFAULT_PORTAL_BACKGROUND;
+  const onImage = theme.tokens.decor === "image";
+  const tenantBackground = tenant?.portal_background_url;
+  const bgUrl = tenantBackground || (theme.id === "atmosphere" ? atmosphereBackground : officeBackground);
 
   const brandMark = (
     <div className="flex items-center gap-2.5">
@@ -35,15 +41,13 @@ export default function PortalAuthShell({
         <img src={tenant.logo_url} alt={name} className="h-8 w-auto" />
       ) : (
         <span
-          className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold ${
-            onImage ? "bg-white/90 text-slate-900" : "bg-primary/10 text-primary"
-          }`}
+          className="h-8 w-8 rounded-md flex items-center justify-center text-sm font-semibold bg-card text-foreground"
         >
           {name.slice(0, 1).toUpperCase()}
         </span>
       )}
       <span
-        className={`font-heading font-semibold text-sm tracking-tight ${onImage ? "text-white" : "text-foreground"}`}
+        className={`font-heading font-semibold text-sm ${onImage ? "text-primary-foreground" : "text-foreground"}`}
       >
         {name}
       </span>
@@ -51,11 +55,11 @@ export default function PortalAuthShell({
   );
 
   const legalRow = (
-    <div className={`mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 ${onImage ? "text-xs text-white/70" : t.mutedText}`}>
+    <div className={`mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 ${onImage ? "text-xs text-primary-foreground/80" : t.mutedText}`}>
       <a href="/impressum" className="hover:underline">
         Impressum
       </a>
-      <span className={`h-1 w-1 rounded-full ${onImage ? "bg-white/40" : "bg-border"}`} />
+      <span className="h-1 w-1 rounded-full bg-border" />
       <a href="/datenschutz" className="hover:underline">
         Datenschutz
       </a>
@@ -106,14 +110,10 @@ export default function PortalAuthShell({
 
   return (
     <div className={t.page}>
-      {t.decor === "image" && (
+      {onImage && (
         <>
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${bgUrl})` }}
-            aria-hidden
-          />
-          <div className="absolute inset-0 bg-slate-950/55" aria-hidden />
+          <img src={bgUrl} alt="" className={`absolute inset-0 h-full w-full object-cover ${theme.id === "atmosphere" ? "scale-105 blur-sm" : ""}`} width={1920} height={1280} aria-hidden />
+          <div className="absolute inset-0 bg-foreground/45" aria-hidden />
         </>
       )}
 

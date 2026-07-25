@@ -54,6 +54,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Sync from DB profile on auth changes
   useEffect(() => {
+    if (window.location.pathname === "/portal-designs") return;
     let cancelled = false;
     const syncFromProfile = async (userId: string) => {
       const { data } = await supabase
