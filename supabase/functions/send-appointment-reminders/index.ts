@@ -175,6 +175,30 @@ async function logEmailSend(
   }
 }
 
+/**
+ * Schreibt auch übersprungene Mails ins zentrale Log, damit im E-Mail-Center
+ * kein Empfänger unsichtbar verloren geht (Grund steht in error_message).
+ */
+async function logSkip(admin: any, app: any, tenant: TenantRow | null, reason: string) {
+  try {
+    await admin.from("email_send_log").insert({
+      message_id: `${REMINDER_KIND}-${app.id}-skip`,
+      tenant_id: tenant?.id ?? app.tenant_id ?? null,
+      template_name: "interview_invite_30min",
+      recipient_email: app.email ?? "(unbekannt)",
+      status: "skipped",
+      error_message: reason,
+      rendered_subject: null,
+      rendered_html: null,
+      sender_email: tenant?.sender_email ?? tenant?.smtp_username ?? null,
+      metadata: { application_id: app.id, kind: REMINDER_KIND, source: "send-appointment-reminders", skip_reason: reason },
+    });
+  } catch (e) {
+    console.warn("email_send_log skip insert failed:", e);
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
