@@ -259,16 +259,17 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const a of todo as any[]) {
-      if (!a.email || !a.tenant_id) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_email_or_tenant" }); continue; }
-      if (!a.magic_token) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_magic_token" }); continue; }
+      if (!a.email || !a.tenant_id) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_email_or_tenant" }); if (!dryRun) await logSkip(admin, a, null, "no_email_or_tenant"); continue; }
+      if (!a.magic_token) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_magic_token" }); if (!dryRun) await logSkip(admin, a, null, "no_magic_token"); continue; }
       const tenant = tenants.get(a.tenant_id);
-      if (!tenant) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_missing" }); continue; }
-      if (tenant.emails_paused) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_paused" }); continue; }
-      if (!hasValidSmtp(tenant)) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "smtp_incomplete" }); continue; }
+      if (!tenant) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_missing" }); if (!dryRun) await logSkip(admin, a, null, "tenant_missing"); continue; }
+      if (tenant.emails_paused) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "tenant_paused" }); if (!dryRun) await logSkip(admin, a, tenant, "tenant_paused"); continue; }
+      if (!hasValidSmtp(tenant)) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "smtp_incomplete" }); if (!dryRun) await logSkip(admin, a, tenant, "smtp_incomplete"); continue; }
 
       const landing = a.target_landing_id ? landingMap.get(a.target_landing_id) : null;
       const domain = landing?.domain || tenant.primary_domain || tenant.domain;
-      if (!domain) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_domain" }); continue; }
+      if (!domain) { skipped++; results.push({ application_id: a.id, status: "skipped", reason: "no_domain" }); if (!dryRun) await logSkip(admin, a, tenant, "no_domain"); continue; }
+
 
       const magicLink = `https://${domain}/bewerbung?token=${a.magic_token}`;
       const startsAt = new Date(a.scheduled_at);
