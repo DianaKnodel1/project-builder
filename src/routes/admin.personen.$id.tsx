@@ -304,6 +304,7 @@ function PersonDetailPage() {
         {!hasScheduledAt && !bookingStatus && app && (
           <div className="text-[11px]">Bewerbung eingegangen, aber noch kein Calendly-Termin gebucht.</div>
         )}
+        {app?.id && <AppointmentHistory applicationId={app.id} />}
       </div>
     ),
   });
