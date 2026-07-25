@@ -18,11 +18,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { computeEmailStats, type EmailLog } from "@/lib/email-stats";
 
 function EmailMonitorWidget() {
-  const [stats, setStats] = useState<{ sent: number; failed: number; pending: number; total: number; successRate: number; actionRequired: boolean } | null>(null);
+  const [stats, setStats] = useState<{ sent: number; failed: number; pending: number; stalePending: number; total: number; successRate: number; actionRequired: boolean } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Identisch zum E-Mail-Center: 7 Tage + gleiche Dedup-Logik.
+    // Identisch zum E-Mail-Center: 7 Tage + gleiche Dedup-Logik (computeEmailStats).
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     supabase
       .from("email_send_log")
@@ -31,27 +31,19 @@ function EmailMonitorWidget() {
       .order("created_at", { ascending: false })
       .limit(5000)
       .then(({ data }) => {
-        const rows = (data ?? []) as EmailLog[];
-        const seen = new Set<string>();
-        const unique: EmailLog[] = [];
-        for (const r of rows) {
-          const key = r.message_id || `${r.template_name}:${r.recipient_email}:${r.created_at}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          unique.push(r);
-        }
-        const pending = unique.filter(l => l.status === "pending").length;
-        const computed = computeEmailStats(unique);
+        const computed = computeEmailStats((data ?? []) as EmailLog[]);
         setStats({
           sent: computed.sent,
-          failed: computed.failed,
-          pending,
-          total: computed.total + pending,
+          failed: computed.failed + computed.bounced,
+          pending: computed.pending,
+          stalePending: computed.stalePending,
+          total: computed.total,
           successRate: computed.successRate,
           actionRequired: computed.actionRequired,
         });
       });
   }, []);
+
 
 
   if (!stats) return null;
