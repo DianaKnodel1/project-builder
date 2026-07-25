@@ -211,3 +211,23 @@ WHERE id = '<TENANT_ID>';
 - Pro Tenant/Sender: **150 Mails/h**, **1 800 Mails/12 h** — enforced in
   `send-application-reminders/index.ts`. Ändert der SMTP-Provider den
   Vertrag, dort anpassen.
+
+---
+
+## E-Mail-Statistik: hängende "pending"-Zeilen aufräumen
+
+`email_send_log.status = 'pending'` wird nur geschrieben, wenn das
+SMTP-Stundenlimit greift ("wird später erneut versucht"). Seit dem Fix markiert
+`send-application-reminders` beim nächsten Versuch die alte Pending-Zeile als
+`superseded`, sodass sie nicht mehr doppelt in Dashboard und E-Mail-Center zählt.
+
+Für Altlasten (Pending-Zeilen aus der Zeit davor):
+
+```bash
+psql "$DATABASE_URL" -f scripts/sql/cleanup-superseded-email-log.sql
+```
+
+Das Skript zeigt zuerst die betroffenen Zeilen, setzt sie dann auf `superseded`
+und listet am Ende die echten Hänger (Pending ohne späteren finalen Versand).
+Dashboard und E-Mail-Center benutzen danach identische Zahlen
+(`computeEmailStats` / `dedupeEmailLogs` in `src/lib/email-stats.ts`).

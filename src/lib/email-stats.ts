@@ -72,12 +72,17 @@ export interface EmailStats {
   failed: number;
   bounced: number;
   suppressed: number;
+  /** Mails, deren letzter Zustand "pending" (Retry offen) ist */
+  pending: number;
+  /** Pending-Mails, die seit > 6h hängen */
+  stalePending: number;
   successRate: number;
   /** Unbearbeitete Fails der letzten 24h (treibt den "Aktion erforderlich"-Banner) */
   openFailures24h: number;
   actionRequired: boolean;
 }
 
+/** Höhere Priorität = "finalerer" Zustand. Pending verliert immer gegen finale Zustände. */
 const STATUS_PRIORITY: Record<string, number> = {
   sent: 6,
   bounced: 5,
@@ -85,21 +90,21 @@ const STATUS_PRIORITY: Record<string, number> = {
   suppressed: 4,
   dlq: 3,
   failed: 2,
-  pending: 1,
+  superseded: 1,
+  pending: 0,
 };
 
+const FINAL_STATUSES = new Set(["sent", "failed", "dlq", "bounced", "complained", "suppressed"]);
+
+/**
+ * Logischer Schlüssel eines Versands: Tenant + Template + Empfänger + Tag.
+ * Retries (pending -> sent/failed) haben unterschiedliche message_ids, fallen
+ * über diesen Schlüssel aber korrekt zusammen — sonst zählt derselbe Versand doppelt.
+ */
 export function emailLogKey(log: EmailLog): string {
   const tenant = log.metadata?.tenant_id || log.metadata?.tenant_name || "global";
   const sentDay = new Date(log.created_at).toISOString().slice(0, 10);
-  if (log.template_name === "invitation" || log.template_name.startsWith("reminder_")) {
-    return ["logical", tenant, log.template_name, log.recipient_email.toLowerCase(), sentDay].join("|");
-  }
-
-  const metaMessageId = typeof log.metadata?.message_id === "string" ? log.metadata.message_id : null;
-  const messageId = log.message_id || metaMessageId;
-  if (messageId) return `message:${messageId}`;
-
-  return [tenant, log.template_name, log.recipient_email.toLowerCase(), sentDay].join("|");
+  return ["logical", tenant, log.template_name, (log.recipient_email ?? "").toLowerCase(), sentDay].join("|");
 }
 
 export function dedupeEmailLogs<T extends EmailLog>(logs: T[]): T[] {
@@ -111,13 +116,20 @@ export function dedupeEmailLogs<T extends EmailLog>(logs: T[]): T[] {
       latest.set(key, log);
       continue;
     }
-    const logTime = new Date(log.created_at).getTime();
-    const currentTime = new Date(current.created_at).getTime();
-    if (logTime > currentTime || (logTime === currentTime && (STATUS_PRIORITY[log.status] ?? 0) > (STATUS_PRIORITY[current.status] ?? 0))) {
-      latest.set(key, log);
-    }
+    if (winsOver(log, current)) latest.set(key, log);
   }
   return Array.from(latest.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+/** Finaler Zustand schlägt pending; unter Gleichen gewinnt der neuere Eintrag. */
+function winsOver(candidate: EmailLog, current: EmailLog): boolean {
+  const candFinal = FINAL_STATUSES.has(candidate.status);
+  const curFinal = FINAL_STATUSES.has(current.status);
+  if (candFinal !== curFinal) return candFinal;
+  const candTime = new Date(candidate.created_at).getTime();
+  const curTime = new Date(current.created_at).getTime();
+  if (candTime !== curTime) return candTime > curTime;
+  return (STATUS_PRIORITY[candidate.status] ?? 0) > (STATUS_PRIORITY[current.status] ?? 0);
 }
 
 /**
@@ -126,13 +138,19 @@ export function dedupeEmailLogs<T extends EmailLog>(logs: T[]): T[] {
  * alte permanente Fehler verschwinden nach Ack aus dem Banner.
  */
 export function computeEmailStats(logs: EmailLog[]): EmailStats {
-  const finalLogs = dedupeEmailLogs(logs).filter(l => l.status !== "pending");
+  const finalLogs = dedupeEmailLogs(logs).filter(l => l.status !== "superseded");
   const total = finalLogs.length;
   const sent = finalLogs.filter(l => l.status === "sent").length;
   const failed = finalLogs.filter(l => ["failed", "dlq"].includes(l.status)).length;
   const bounced = finalLogs.filter(l => l.status === "bounced").length;
   const suppressed = finalLogs.filter(l => l.status === "suppressed").length;
-  const successRate = total > 0 ? Math.round((sent / total) * 100) : 100;
+  const pendingLogs = finalLogs.filter(l => l.status === "pending");
+  const staleCutoff = Date.now() - 6 * 3600_000;
+  const stalePending = pendingLogs.filter(l => new Date(l.created_at).getTime() < staleCutoff).length;
+
+  // Erfolgsquote nur über abgeschlossene Versände — pending zählt nicht dagegen.
+  const finished = sent + failed + bounced;
+  const successRate = finished > 0 ? Math.round((sent / finished) * 100) : 100;
 
   const cutoff = Date.now() - 24 * 3600_000;
   const openFailures24h = finalLogs.filter(l =>
@@ -147,8 +165,11 @@ export function computeEmailStats(logs: EmailLog[]): EmailStats {
     failed,
     bounced,
     suppressed,
+    pending: pendingLogs.length,
+    stalePending,
     openFailures24h,
     actionRequired: openFailures24h > 0,
     successRate,
   };
 }
+

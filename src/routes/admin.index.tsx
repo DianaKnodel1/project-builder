@@ -18,11 +18,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { computeEmailStats, type EmailLog } from "@/lib/email-stats";
 
 function EmailMonitorWidget() {
-  const [stats, setStats] = useState<{ sent: number; failed: number; pending: number; total: number; successRate: number; actionRequired: boolean } | null>(null);
+  const [stats, setStats] = useState<{ sent: number; failed: number; pending: number; stalePending: number; total: number; successRate: number; actionRequired: boolean } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Identisch zum E-Mail-Center: 7 Tage + gleiche Dedup-Logik.
+    // Identisch zum E-Mail-Center: 7 Tage + gleiche Dedup-Logik (computeEmailStats).
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     supabase
       .from("email_send_log")
@@ -31,27 +31,19 @@ function EmailMonitorWidget() {
       .order("created_at", { ascending: false })
       .limit(5000)
       .then(({ data }) => {
-        const rows = (data ?? []) as EmailLog[];
-        const seen = new Set<string>();
-        const unique: EmailLog[] = [];
-        for (const r of rows) {
-          const key = r.message_id || `${r.template_name}:${r.recipient_email}:${r.created_at}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          unique.push(r);
-        }
-        const pending = unique.filter(l => l.status === "pending").length;
-        const computed = computeEmailStats(unique);
+        const computed = computeEmailStats((data ?? []) as EmailLog[]);
         setStats({
           sent: computed.sent,
-          failed: computed.failed,
-          pending,
-          total: computed.total + pending,
+          failed: computed.failed + computed.bounced,
+          pending: computed.pending,
+          stalePending: computed.stalePending,
+          total: computed.total,
           successRate: computed.successRate,
           actionRequired: computed.actionRequired,
         });
       });
   }, []);
+
 
 
   if (!stats) return null;
@@ -84,8 +76,9 @@ function EmailMonitorWidget() {
           </div>
           <div className={`text-center p-3 rounded-lg border ${stats.pending > 0 ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/40" : "bg-muted/60 border-border"}`}>
             <p className={`text-lg font-bold ${stats.pending > 0 ? "text-amber-700 dark:text-amber-300" : "text-foreground"}`}>{stats.pending}</p>
-            <p className={`text-[10px] font-medium ${stats.pending > 0 ? "text-amber-700/80 dark:text-amber-300/80" : "text-muted-foreground"}`}>In Warteschlange</p>
+            <p className={`text-[10px] font-medium ${stats.pending > 0 ? "text-amber-700/80 dark:text-amber-300/80" : "text-muted-foreground"}`}>Retry offen</p>
           </div>
+
           <div className={`text-center p-3 rounded-lg border ${stats.failed > 0 ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/40" : "bg-muted/60 border-border"}`}>
             <div className="flex items-center justify-center gap-1">
               {stats.failed > 0 ? <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" /> : null}
@@ -99,6 +92,14 @@ function EmailMonitorWidget() {
           </div>
         </div>
 
+        {stats.stalePending > 0 && (
+          <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-900/50">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              {stats.stalePending} E-Mail(s) hängen seit über 6 Stunden im Retry
+            </p>
+          </div>
+        )}
 
         {stats.actionRequired && (
           <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-900/50">
@@ -108,6 +109,7 @@ function EmailMonitorWidget() {
             </p>
           </div>
         )}
+
       </CardContent>
     </Card>
   );
