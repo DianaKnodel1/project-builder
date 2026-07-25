@@ -31,6 +31,7 @@ import {
 } from "@/lib/email-stats";
 import { acknowledgeFailedEmails } from "@/lib/email-log-ack.functions";
 import { BounceSuppressionPanel } from "@/components/BounceSuppressionPanel";
+import { resendEmailLog, isTokenTemplate } from "@/lib/email-resend";
 
 type EmailLogFull = EmailLog & {
   rendered_html?: string | null;
@@ -50,6 +51,7 @@ export function AdminEmailLogsPage() {
   const [previewLog, setPreviewLog] = useState<EmailLogFull | null>(null);
   const [sendingTest, setSendingTest] = useState(false);
   const [acking, setAcking] = useState(false);
+  const [confirmResend, setConfirmResend] = useState<EmailLogFull | null>(null);
   const ackFn = useServerFn(acknowledgeFailedEmails);
   const { toast } = useToast();
 
@@ -291,13 +293,14 @@ export function AdminEmailLogsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {paged.map((log) => {
-                const canResend = ["failed", "dlq"].includes(log.status);
+                const isFail = ["failed", "dlq"].includes(log.status);
+                const canResend = !!log.rendered_html && !isTokenTemplate(log.template_name);
                 const smtpHost = log.metadata?.smtp_host;
 
                 return (
                   <tr
                     key={log.id}
-                    className={`hover:bg-muted/30 transition-colors cursor-pointer ${canResend ? "bg-destructive/[0.02]" : ""}`}
+                    className={`hover:bg-muted/30 transition-colors cursor-pointer ${isFail ? "bg-destructive/[0.02]" : ""}`}
                     onClick={() => setPreviewLog(log)}
                   >
                     <td className="px-4 py-3">
@@ -336,7 +339,7 @@ export function AdminEmailLogsPage() {
                         </Button>
                         {canResend && (
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                            onClick={() => resendEmail(log)} disabled={resending === log.id} title="Erneut senden">
+                            onClick={() => setConfirmResend(log)} disabled={resending === log.id} title="Erneut senden">
                             <RotateCcw className={`h-3.5 w-3.5 ${resending === log.id ? "animate-spin" : ""}`} />
                           </Button>
                         )}
