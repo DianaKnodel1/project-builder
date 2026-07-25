@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { TableSkeleton } from "@/components/SkeletonLoaders";
 import { StageHistoryCard } from "@/components/StageHistoryCard";
+import { AppointmentHistory } from "@/components/AppointmentHistory";
 
 export const Route = createFileRoute("/admin/personen/$id")({
   component: PersonDetailPage,
