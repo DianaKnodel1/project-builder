@@ -6,6 +6,9 @@
 ALTER TABLE public.tenants
   ADD COLUMN IF NOT EXISTS portal_theme text NOT NULL DEFAULT 'clean';
 
+ALTER TABLE public.tenants
+  DROP CONSTRAINT IF EXISTS tenants_portal_theme_check;
+
 UPDATE public.tenants
 SET portal_theme = CASE
   WHEN portal_theme IN ('image') THEN 'office'
@@ -13,8 +16,6 @@ SET portal_theme = CASE
   ELSE 'clean'
 END;
 
-ALTER TABLE public.tenants
-  DROP CONSTRAINT IF EXISTS tenants_portal_theme_check;
 ALTER TABLE public.tenants
   ADD CONSTRAINT tenants_portal_theme_check
   CHECK (portal_theme IN ('clean', 'office', 'atmosphere'));
