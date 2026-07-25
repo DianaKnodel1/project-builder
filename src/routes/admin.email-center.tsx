@@ -35,7 +35,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "invitation",                       label: "Herzlichen Glückwunsch", group: "Onboarding", trigger: "Sofort nach Fast-Track-Zusage" },
   { key: "reminder_invite",                  label: "Registrierung abschließen",    group: "Reminder",   trigger: "Akzeptierte Bewerber ohne Account" },
   { key: "reminder_complete_registration",   label: "Onboarding (Perso/Vertrag)",   group: "Reminder",   trigger: "Nach Registrierung ohne KYC/Vertrag" },
-  { key: "email_confirmation", keys: ["signup_confirmation", "reminder_confirm_email"], label: "E-Mail bestätigen", group: "Reminder", trigger: "Registrierung + Reminder bei unbestätigter Mail" },
+  { key: "email_confirmation", keys: ["signup_confirmation", "signup_confirmation_resend", "reminder_confirm_email"], label: "E-Mail bestätigen", group: "Reminder", trigger: "Registrierung, erneutes Senden + Reminder bei unbestätigter Mail" },
   { key: "reminder_no_recent_booking",       label: "Keine Buchung (7 Tage)",       group: "Reminder",   trigger: "1 Reminder nach 7 Tagen ohne Auftragsbuchung" },
   { key: "chat_reminder",                    label: "Chat-Reminder (manuell)",      group: "Support",    trigger: "Wird vom Admin manuell ausgelöst" },
   { key: "password_reset",                   label: "Passwort zurücksetzen",        group: "Auth",       trigger: "User löst Reset aus" },
