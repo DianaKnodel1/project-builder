@@ -12,7 +12,10 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { translateAuthError } from "@/lib/auth-errors";
-import { ShieldCheck, Lock, FileText, Calendar, CheckCircle2, MailCheck } from "lucide-react";
+import { MailCheck } from "lucide-react";
+import PortalAuthShell from "@/components/portal/PortalAuthShell";
+import { usePortalTheme } from "@/hooks/use-portal-theme";
+
 
 const LOGIN_TIMEOUT_MS = 15000;
 const PROFILE_CHECK_TIMEOUT_MS = 10000;
