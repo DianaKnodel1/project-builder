@@ -21,7 +21,7 @@ const corsHeaders = {
 const DEFAULT_SUBJECT = "Passwort zurücksetzen – {{tenant_name}}";
 const DEFAULT_BODY = `<h1 style="font-size:22px;margin:0 0 16px;color:#0f172a">Passwort zurücksetzen</h1>
 <p style="font-size:15px;line-height:1.6;color:#475569;margin:0 0 16px">Hallo {{first_name}},</p>
-<p style="font-size:15px;line-height:1.6;color:#475569;margin:0 0 24px">du hast ein neues Passwort für dein Konto bei <strong>{{tenant_name}}</strong> angefordert. Klicke auf den Button, um ein neues Passwort zu setzen. Der Link ist 1 Stunde gültig.</p>
+<p style="font-size:15px;line-height:1.6;color:#475569;margin:0 0 24px">du hast ein neues Passwort für dein Konto bei <strong>{{tenant_name}}</strong> angefordert. Klicke auf den Button, um ein neues Passwort zu setzen. Der Link ist 24 Stunden gültig und kann nur einmal verwendet werden. Danach musst du einen neuen Link anfordern.</p>
 {{cta:Passwort zurücksetzen|{{reset_url}}}}
 <p style="font-size:13px;color:#94a3b8;margin:24px 0 0">Oder kopiere diesen Link: {{reset_url}}</p>
 <p style="font-size:12px;color:#94a3b8;margin:16px 0 0">Wenn du das nicht angefordert hast, kannst du diese Mail ignorieren — dein Passwort bleibt unverändert.</p>`;
