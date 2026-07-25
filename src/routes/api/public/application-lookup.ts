@@ -119,14 +119,14 @@ export const Route = createFileRoute("/api/public/application-lookup")({
 
         const booked = isBooked(app);
         let magicToken: string | null = app.magic_token ?? null;
-        const expiresAt = app.magic_token_expires_at ? new Date(app.magic_token_expires_at).getTime() : 0;
-        if (!magicToken || !expiresAt || expiresAt <= Date.now()) {
+        // Bewerbungs-/Interview-Magic-Links laufen bewusst NICHT ab.
+        if (!magicToken) {
           magicToken = `${crypto.randomUUID()}-${crypto.randomUUID().slice(0, 8)}`;
           const { error: tokenError } = await supabaseAdmin
             .from("applications")
             .update({
               magic_token: magicToken,
-              magic_token_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+              magic_token_expires_at: null,
               target_landing_id: targetLanding?.id ?? app.target_landing_id ?? null,
             } as any)
             .eq("id", app.id);
