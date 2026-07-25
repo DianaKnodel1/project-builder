@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { TableSkeleton } from "@/components/SkeletonLoaders";
 import { StageHistoryCard } from "@/components/StageHistoryCard";
+import { AppointmentHistory } from "@/components/AppointmentHistory";
 
 export const Route = createFileRoute("/admin/personen/$id")({
   component: PersonDetailPage,
@@ -303,6 +304,7 @@ function PersonDetailPage() {
         {!hasScheduledAt && !bookingStatus && app && (
           <div className="text-[11px]">Bewerbung eingegangen, aber noch kein Calendly-Termin gebucht.</div>
         )}
+        {app?.id && <AppointmentHistory applicationId={app.id} />}
       </div>
     ),
   });
