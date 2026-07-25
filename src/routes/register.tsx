@@ -448,13 +448,18 @@ function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/50 p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.03),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(var(--primary)/0.02),transparent_50%)]" />
+    <AuthShell
+      width="lg"
+      title={step === 99 ? "Fast geschafft!" : "Konto erstellen"}
+      description={
+        step === 99
+          ? undefined
+          : "Nur wenige Schritte bis zu deinem Zugang zum Mitarbeiter-Portal."
+      }
+    >
+      <div className="space-y-6">
+        {step !== 99 && <WizardProgress step={step} />}
 
-      <Card className="w-full max-w-lg animate-fade-in shadow-2xl border-0 bg-card/95 backdrop-blur-sm relative">
-        <CardContent className="pt-8 pb-8 px-8">
-          <WizardProgress step={step} />
 
           {step === 0 && (
             <StepAccount
