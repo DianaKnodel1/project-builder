@@ -729,6 +729,13 @@ serve(async (req) => {
         }, { onConflict: "application_id,reminder_kind" });
         // Sichtbarkeit im E-Mail-Center
         try {
+          // Alte "pending"-Retry-Zeilen desselben Versands abschließen, damit sie
+          // nicht dauerhaft als "Warteschlange" in der Statistik hängen bleiben.
+          await admin.from("email_send_log")
+            .update({ status: "superseded" })
+            .eq("template_name", templateName)
+            .eq("recipient_email", app.email)
+            .eq("status", "pending");
           await admin.from("email_send_log").insert({
             message_id: messageId, tenant_id: tenant.id,
             template_name: templateName, recipient_email: app.email,
@@ -737,6 +744,7 @@ serve(async (req) => {
             metadata: { application_id: app.id, kind, source: "send-application-reminders", sender_kind: emailKind, resolved_tenant_id: tenant.id },
           } as any);
         } catch { /* non-critical */ }
+
         sent++; results.push({ app: app.id, kind, status: "sent" });
         runSentByTenant.set(tenant.id, runCount + 1);
         failStreakByTenant.set(tenant.id, 0);
