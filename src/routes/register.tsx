@@ -20,6 +20,8 @@ import StepEmployment from "@/components/register/StepEmployment";
 import StepContract from "@/components/register/StepContract";
 import StepIdentity from "@/components/register/StepIdentity";
 import StepOptional from "@/components/register/StepOptional";
+import { usePortalTheme } from "@/hooks/use-portal-theme";
+
 
 const STORAGE_KEY = "onboarding_wizard_step";
 const STORAGE_USER = "onboarding_user_id";
