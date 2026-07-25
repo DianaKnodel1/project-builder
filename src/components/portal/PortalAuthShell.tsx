@@ -120,10 +120,24 @@ export default function PortalAuthShell({
     <div className={t.page}>
       {onImage && (
         <>
-          <img src={bgUrl} alt="" className={`absolute inset-0 h-full w-full object-cover ${theme.id === "atmosphere" ? "scale-105 blur-sm" : ""}`} width={1920} height={1280} aria-hidden />
-          <div className="absolute inset-0 bg-foreground/45" aria-hidden />
+          <img
+            src={bgUrl}
+            alt=""
+            className={`absolute inset-0 h-full w-full object-cover ${
+              theme.id === "atmosphere" ? "scale-105 blur-[2px]" : ""
+            }`}
+            width={1920}
+            height={1280}
+            aria-hidden
+          />
+          {/* Verlauf: oben leicht, unten kräftig — Bild bleibt erkennbar, Texte lesbar. */}
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-foreground/45 via-foreground/35 to-foreground/70"
+            aria-hidden
+          />
         </>
       )}
+
 
       {t.decor === "glow" && (
         <>
