@@ -9,10 +9,10 @@ import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import AuthShell from "@/components/auth/AuthShell";
+import PortalAuthShell from "@/components/portal/PortalAuthShell";
+import { usePortalTheme } from "@/hooks/use-portal-theme";
 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -20,6 +20,7 @@ function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const t = usePortalTheme().tokens;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,55 +41,48 @@ function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <AuthShell title="E-Mail gesendet" description="Prüfe dein Postfach.">
-        <div className="space-y-5">
-          <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
-            <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <p className="text-sm text-muted-foreground">
-              Wenn ein Konto mit dieser E-Mail existiert, erhältst du einen Link zum Zurücksetzen deines
-              Passworts. Der Link ist 24 Stunden gültig und nur einmal nutzbar.
-            </p>
-          </div>
-          <Button variant="outline" className="w-full h-11 gap-2" onClick={() => navigate("/login")}>
-            <ArrowLeft className="h-4 w-4" /> Zurück zum Login
-          </Button>
+      <PortalAuthShell
+        title="E-Mail gesendet"
+        description="Wenn ein Konto mit dieser E-Mail existiert, erhältst du einen Link zum Zurücksetzen deines Passworts. Der Link ist 24 Stunden gültig und einmalig nutzbar."
+      >
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+          <p className={t.subText}>Prüfe dein Postfach — auch den Spam-Ordner.</p>
         </div>
-      </AuthShell>
+        <Button variant="outline" className={t.secondaryButton} onClick={() => navigate("/login")}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Zurück zum Login
+        </Button>
+      </PortalAuthShell>
     );
   }
 
   return (
-    <AuthShell
+    <PortalAuthShell
       title="Passwort vergessen"
-      description="Gib deine E-Mail ein und wir senden dir einen Link zum Zurücksetzen."
+      description="Gib deine E-Mail ein und wir senden dir einen Reset-Link."
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <label htmlFor="reset-email" className="text-sm font-medium text-foreground">
-            E-Mail-Adresse
-          </label>
+          <label className={t.label}>E-Mail</label>
           <Input
-            id="reset-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@unternehmen.de"
-            autoComplete="email"
-            className="h-11"
+            placeholder="max@beispiel.de"
+            className={t.input}
             required
           />
         </div>
-        <Button type="submit" className="w-full h-11 text-sm font-semibold" disabled={loading}>
+        <Button type="submit" className={t.primaryButton} disabled={loading}>
           {loading ? "Wird gesendet…" : "Reset-Link senden"}
         </Button>
       </form>
-      <button
-        onClick={() => navigate("/login")}
-        className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        ← Zurück zum Login
-      </button>
-    </AuthShell>
+      <p className="text-center">
+        <button onClick={() => navigate("/login")} className={`${t.mutedText} hover:underline`}>
+          ← Zurück zum Login
+        </button>
+      </p>
+    </PortalAuthShell>
   );
 }
 

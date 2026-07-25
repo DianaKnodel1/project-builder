@@ -13,7 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { translateAuthError } from "@/lib/auth-errors";
 import { MailCheck } from "lucide-react";
-import AuthShell from "@/components/auth/AuthShell";
+import PortalAuthShell from "@/components/portal/PortalAuthShell";
+import { usePortalTheme } from "@/hooks/use-portal-theme";
 
 
 const LOGIN_TIMEOUT_MS = 15000;
@@ -42,6 +43,8 @@ function LoginPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenant } = useTenant();
+  const t = usePortalTheme().tokens;
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,22 +178,16 @@ function LoginPage() {
   };
 
   return (
-    <AuthShell
-      title="Anmelden"
+    <PortalAuthShell
+      title="Willkommen zurück"
       description="Melde dich an, um deine Aufträge, Termine und Dokumente zu verwalten."
     >
       {needsVerify && (
-        <div className="rounded-lg border border-border bg-muted/50 p-3 flex items-start gap-3">
-          <MailCheck className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+        <div className={t.warnBox}>
+          <MailCheck className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
           <div className="space-y-1.5 flex-1">
-            <p className="text-xs text-foreground">
-              Bitte bestätige deine E-Mail-Adresse, bevor du dich anmeldest.
-            </p>
-            <button
-              type="button"
-              onClick={resendVerify}
-              className="text-xs font-medium text-primary underline underline-offset-4"
-            >
+            <p className={t.warnText}>Bitte bestätige deine E-Mail-Adresse, bevor du dich anmeldest.</p>
+            <button type="button" onClick={resendVerify} className={t.warnAction}>
               Bestätigungslink erneut senden
             </button>
           </div>
@@ -198,17 +195,14 @@ function LoginPage() {
       )}
 
       {authError && !needsVerify && (
-        <div
-          className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-          role="alert"
-        >
+        <div className={t.errorBox} role="alert">
           {authError}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium text-foreground">
+          <label htmlFor="email" className={t.label}>
             E-Mail-Adresse
           </label>
           <Input
@@ -218,23 +212,14 @@ function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="name@unternehmen.de"
             autoComplete="email"
-            className="h-11"
+            className={t.input}
             required
           />
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-medium text-foreground">
-              Passwort
-            </label>
-            <button
-              type="button"
-              onClick={() => navigate("/forgot-password")}
-              className="text-xs font-medium text-primary hover:underline underline-offset-4"
-            >
-              Passwort vergessen?
-            </button>
-          </div>
+          <label htmlFor="password" className={t.label}>
+            Passwort
+          </label>
           <Input
             id="password"
             type="password"
@@ -242,28 +227,38 @@ function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete="current-password"
-            className="h-11"
+            className={t.input}
             required
           />
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className={`${t.mutedText} font-medium underline-offset-4 hover:underline transition-colors`}
+            >
+              Passwort vergessen?
+            </button>
+          </div>
         </div>
 
-        <Button type="submit" size="lg" className="w-full h-11 text-sm font-semibold" disabled={loading}>
+        <Button type="submit" size="lg" className={t.primaryButton} disabled={loading}>
           {loading ? "Wird angemeldet…" : "Anmelden"}
         </Button>
       </form>
 
-      <div className="pt-2 border-t border-border space-y-3">
-        <p className="text-center text-sm text-muted-foreground pt-4">Noch keinen Zugang?</p>
-        <Button
-          size="lg"
-          variant="outline"
-          className="w-full h-11 text-sm font-medium"
-          onClick={() => navigate("/register")}
-        >
-          Konto erstellen
-        </Button>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className={t.dividerLine} />
+        </div>
+        <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
+          <span className={t.dividerLabel}>Neu hier?</span>
+        </div>
       </div>
-    </AuthShell>
+
+      <Button size="lg" variant="outline" className={t.secondaryButton} onClick={() => navigate("/register")}>
+        Konto erstellen
+      </Button>
+    </PortalAuthShell>
   );
 }
 

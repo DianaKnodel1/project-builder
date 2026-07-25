@@ -13,6 +13,10 @@ import {
 import { listPartnerCompanies } from "@/lib/partner-companies.functions";
 import { THEME_LIST, THEMES } from "@/lib/landing-themes";
 import { THEME_ASSETS } from "@/lib/theme-assets.generated";
+import { PORTAL_THEMES, type PortalThemeId } from "@/lib/portal-themes";
+import { setTenantPortalTheme } from "@/lib/portal-theme.functions";
+import PortalThemePreview from "@/components/admin/PortalThemePreview";
+
 
 const ASSET_MIME: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
@@ -60,6 +64,8 @@ type Branding = {
   landing_domain: string;
   api_endpoint: string;
   portal_url: string;
+  portal_theme: PortalThemeId;
+
   supabase_url: string;
   supabase_anon_key: string;
   tenant_id: string;
@@ -105,6 +111,8 @@ const EMPTY: Branding = {
   landing_domain: "",
   api_endpoint: "",
   portal_url: "",
+  portal_theme: "classic",
+
   supabase_url: "",
   supabase_anon_key: "",
   tenant_id: "",
@@ -235,6 +243,8 @@ function LandingGeneratorPage() {
   const getFn = useServerFn(getLandingPage);
   const delFn = useServerFn(deleteLandingPage);
   const toggleFn = useServerFn(toggleLandingPublished);
+  const setPortalThemeFn = useServerFn(setTenantPortalTheme);
+
   const [landings, setLandings] = useState<any[]>([]);
   const [landingsLoading, setLandingsLoading] = useState(true);
   const listPartnersFn = useServerFn(listPartnerCompanies);
@@ -625,6 +635,8 @@ document.addEventListener('submit', function(e){
           hrb: b.hrb, registergericht: b.registergericht, ust_id: b.ust_id, steuernummer: b.steuernummer,
           geschaeftsfuehrer: b.geschaeftsfuehrer, impressum: b.impressum,
           api_endpoint: b.api_endpoint, portal_url: b.portal_url, tenant_id: b.tenant_id,
+          portal_theme: b.portal_theme || "classic",
+
           seo_title: b.seo_title, seo_description: b.seo_description, seo_image: b.seo_image,
           recruiter_name: b.recruiter_name || "Sabine Schneider",
           recruiter_avatar_url: b.recruiter_avatar_url || null,
@@ -653,7 +665,22 @@ document.addEventListener('submit', function(e){
       } as any });
       setEditingId((row as any).id);
       setSlug((row as any).slug);
+
+      // Portal-Design auf den Tenant übertragen (nur Fast-Track hat ein Portal).
+      if (branding.flow_type === "fast" && branding.tenant_id) {
+        try {
+          await setPortalThemeFn({ data: { tenant_id: branding.tenant_id, portal_theme: branding.portal_theme || "classic" } });
+        } catch (e: any) {
+          toast({
+            title: "Portal-Design nicht übernommen",
+            description: e?.message ?? String(e),
+            variant: "destructive",
+          });
+        }
+      }
+
       const r: any = row;
+
       const dnsLabel = r.dnsStatus === "auto" ? "DNS automatisch gesetzt" : r.dnsStatus === "manual" ? "DNS-Hinweis (kein Fehler)" : r.dnsStatus === "skipped" ? "Kein Server im Pool" : "DNS-Fehler";
       const serverLabel = r.assignedServer ? `Server: ${r.assignedServer.name}` : "Kein Server zugewiesen";
       const isHardError = r.dnsStatus === "error";
@@ -1013,6 +1040,35 @@ document.addEventListener('submit', function(e){
                     <p className="text-[10px] text-muted-foreground mt-1">Tenant-eigenes Portal. Bei Fast-Track wird der Bewerber hierhin zu <code>/register</code> weitergeleitet.</p>
                   </Field>
                 )}
+                {branding.flow_type === "fast" && (
+                  <div className="sm:col-span-2 space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                    <Label className="text-xs font-semibold">Portal-Design (Login & Registrierung)</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Gilt für das Mitarbeiter-Portal dieses Tenants: Login, Registrierung und Passwort-vergessen. Wird beim Speichern auf den Tenant übertragen.
+                    </p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {PORTAL_THEMES.map((pt) => (
+                        <button
+                          key={pt.id}
+                          type="button"
+                          onClick={() => setBranding((b) => ({ ...b, portal_theme: pt.id }))}
+                          className={cn(
+                            "text-left rounded-md border-2 p-3 transition-all text-xs",
+                            branding.portal_theme === pt.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+                          )}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold">{pt.name}</span>
+                            {branding.portal_theme === pt.id && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                          </div>
+                          <PortalThemePreview id={pt.id} />
+                          <p className="text-muted-foreground text-[11px] mt-2">{pt.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <Field label="Supabase URL (optional — nur bei Direkt-Insert)">
                   <Input value={branding.supabase_url} onChange={set("supabase_url")} placeholder="leer lassen" />
                 </Field>
