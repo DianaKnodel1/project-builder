@@ -7,7 +7,7 @@ export const Route = createFileRoute("/register")({
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import AuthShell from "@/components/auth/AuthShell";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { translateAuthError } from "@/lib/auth-errors";
