@@ -778,6 +778,11 @@ serve(async (req) => {
           sent_at: new Date().toISOString(),
         }, { onConflict: "application_id,reminder_kind" });
         try {
+          await admin.from("email_send_log")
+            .update({ status: "superseded" })
+            .eq("template_name", templateName)
+            .eq("recipient_email", app.email)
+            .eq("status", "pending");
           await admin.from("email_send_log").insert({
             message_id: messageId, tenant_id: tenant.id,
             template_name: templateName, recipient_email: app.email,
@@ -787,6 +792,7 @@ serve(async (req) => {
             metadata: { application_id: app.id, kind, source: "send-application-reminders", sender_kind: emailKind, resolved_tenant_id: tenant.id },
           } as any);
         } catch { /* non-critical */ }
+
         failed++; results.push({ app: app.id, kind, status: "failed", reason: errMsg });
         const streak = (failStreakByTenant.get(tenant.id) ?? 0) + 1;
         failStreakByTenant.set(tenant.id, streak);
