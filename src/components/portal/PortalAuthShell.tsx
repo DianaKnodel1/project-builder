@@ -47,10 +47,13 @@ export default function PortalAuthShell({
         </span>
       )}
       <span
-        className={`font-heading font-semibold text-sm ${onImage ? "text-primary-foreground" : "text-foreground"}`}
+        className={`font-heading font-semibold text-sm tracking-tight ${
+          onImage ? "text-primary-foreground [text-shadow:0_1px_3px_rgb(0_0_0/0.5)]" : "text-foreground"
+        }`}
       >
         {name}
       </span>
+
     </div>
   );
 
