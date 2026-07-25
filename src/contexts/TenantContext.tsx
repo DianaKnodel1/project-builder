@@ -31,6 +31,9 @@ export interface Tenant {
   contract_additions: string | null;
   default_task_template_id: string | null;
   ai_enabled: boolean;
+  /** Portal-Design für Login/Registrierung (classic | minimal | split | soft) */
+  portal_theme?: string | null;
+
 }
 
 interface TenantContextType {
