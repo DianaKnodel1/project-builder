@@ -32,8 +32,6 @@ const corsHeaders = {
 // Templates mit ablaufenden Links/Tokens: gespeichertes HTML enthält den ALTEN Link.
 // Diese dürfen nicht "blind" erneut gesendet werden.
 const TOKEN_TEMPLATES = new Set([
-  "bewerbung_magic_link",
-  "interview_invite_30min",
   "signup_confirmation",
   "signup_confirmation_resend",
   "password_reset",

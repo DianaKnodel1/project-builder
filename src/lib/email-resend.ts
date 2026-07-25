@@ -27,8 +27,6 @@ export async function resendEmailLog(
 
 /** Templates mit ablaufenden Links — Resend schickt den ALTEN Link. */
 export const TOKEN_TEMPLATES = new Set([
-  "bewerbung_magic_link",
-  "interview_invite_30min",
   "signup_confirmation",
   "signup_confirmation_resend",
   "password_reset",
