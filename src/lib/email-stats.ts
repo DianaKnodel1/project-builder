@@ -48,6 +48,9 @@ export const EMAIL_TYPE_LABELS: Record<string, string> = {
   bewerbung_magic_link: "Vermittlung · Interview-Einladung",
   booking_confirmation: "Vermittlung · Terminbestätigung",
   signup_confirmation: "E-Mail bestätigen",
+  signup_confirmation_resend: "E-Mail bestätigen · erneut gesendet",
+  interview_invite_30min: "Vermittlung · Interview-Einladung (30 Min)",
+
   chat_reminder: "Chat-Reminder",
   vermittlung_no_booking_24h: "Vermittlung · Kein Termin 24h",
   vermittlung_no_booking_72h: "Vermittlung · Kein Termin 72h",

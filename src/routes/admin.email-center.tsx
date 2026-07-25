@@ -26,7 +26,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "vermittlung_no_booking_24h", label: "Vermittlung: Kein Termin (24h)",  group: "Vermittlung", trigger: "24h nach Bewerbung ohne Calendly-Buchung" },
   { key: "vermittlung_no_booking_72h", label: "Vermittlung: Kein Termin (72h)",  group: "Vermittlung", trigger: "72h nach Bewerbung ohne Calendly-Buchung" },
   { key: "vermittlung_no_show_24h",    label: "No-Show Interview",               group: "Vermittlung", trigger: "24h nach verpasstem Termin" },
-  { key: "bewerbung_magic_link",       label: "Vermittlung: Interview-Einladung", group: "Vermittlung", trigger: "30 Minuten vor dem Termin" },
+  { key: "interview_invite_30min",     keys: ["interview_invite_30min", "bewerbung_magic_link"], label: "Vermittlung: Interview-Einladung", group: "Vermittlung", trigger: "30 Minuten vor dem Termin" },
   { key: "booking_confirmation",       label: "Vermittlung: Terminbestätigung",   group: "Vermittlung", trigger: "Direkt nach Terminbuchung" },
   { key: "application_received",       label: "Vermittlung: Bewerbung eingegangen", group: "Vermittlung", trigger: "Sofort nach Bewerbungseingang (Broker-Flow)" },
   { key: "vermittlung_registration_pending", keys: ["vermittlung_registration_pending_24h", "vermittlung_registration_pending_72h", "fasttrack_registration_pending_24h", "fasttrack_registration_pending_72h"], label: "Registrierung offen", group: "Vermittlung", trigger: "24h / 72h nach Zusage ohne Registrierung" },
@@ -35,7 +35,7 @@ const ACTIVE_TEMPLATES: { key: string; keys?: string[]; label: string; group: st
   { key: "invitation",                       label: "Herzlichen Glückwunsch", group: "Onboarding", trigger: "Sofort nach Fast-Track-Zusage" },
   { key: "reminder_invite",                  label: "Registrierung abschließen",    group: "Reminder",   trigger: "Akzeptierte Bewerber ohne Account" },
   { key: "reminder_complete_registration",   label: "Onboarding (Perso/Vertrag)",   group: "Reminder",   trigger: "Nach Registrierung ohne KYC/Vertrag" },
-  { key: "email_confirmation", keys: ["signup_confirmation", "reminder_confirm_email"], label: "E-Mail bestätigen", group: "Reminder", trigger: "Registrierung + Reminder bei unbestätigter Mail" },
+  { key: "email_confirmation", keys: ["signup_confirmation", "signup_confirmation_resend", "reminder_confirm_email"], label: "E-Mail bestätigen", group: "Reminder", trigger: "Registrierung, erneutes Senden + Reminder bei unbestätigter Mail" },
   { key: "reminder_no_recent_booking",       label: "Keine Buchung (7 Tage)",       group: "Reminder",   trigger: "1 Reminder nach 7 Tagen ohne Auftragsbuchung" },
   { key: "chat_reminder",                    label: "Chat-Reminder (manuell)",      group: "Support",    trigger: "Wird vom Admin manuell ausgelöst" },
   { key: "password_reset",                   label: "Passwort zurücksetzen",        group: "Auth",       trigger: "User löst Reset aus" },
@@ -95,6 +95,15 @@ function AdminEmailCenterPage() {
     }
     return m;
   }, [rows]);
+
+  // Wie viele der aktiven Kettenschritte hatten im Zeitraum mind. einen Versand?
+  const coverage = useMemo(() => {
+    const active = ACTIVE_TEMPLATES.filter(t =>
+      (t.keys ?? [t.key]).some(k => (perTemplate.get(k)?.sent ?? 0) + (perTemplate.get(k)?.failed ?? 0) + (perTemplate.get(k)?.pending ?? 0) > 0)
+    ).length;
+    return { active, total: ACTIVE_TEMPLATES.length };
+  }, [perTemplate]);
+
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -160,8 +169,14 @@ function AdminEmailCenterPage() {
               <div className="text-sm font-semibold">Aktive Mail-Templates</div>
               <div className="text-[11px] text-muted-foreground mt-0.5">Klick auf ein Template öffnet den Editor.</div>
             </div>
-            <div className="text-xs text-muted-foreground">Zeitraum: {range === "24h" ? "24 h" : range === "7d" ? "7 Tage" : "30 Tage"}</div>
+            <div className="text-right">
+              <div className="text-xs font-medium">
+                {coverage.active} von {coverage.total} Schritten aktiv
+              </div>
+              <div className="text-[11px] text-muted-foreground">Zeitraum: {range === "24h" ? "24 h" : range === "7d" ? "7 Tage" : "30 Tage"}</div>
+            </div>
           </div>
+
           <div className="divide-y">
             {ACTIVE_TEMPLATES.map(t => {
               const keys = t.keys ?? [t.key];
