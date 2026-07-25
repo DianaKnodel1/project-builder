@@ -12,6 +12,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import { resolveSender, type EmailKind } from "../_shared/sender-resolver.ts";
 import { renderEmail } from "../_shared/email-wrapper.ts";
+import {
+  MAX_PER_1H_PER_TENANT as LIMIT_1H,
+  MAX_PER_12H_PER_TENANT as LIMIT_12H,
+  MAX_PER_RUN_PER_TENANT as LIMIT_RUN,
+} from "../_shared/limits.ts";
 
 const FUNCTION_VERSION = "2026-07-15-rebook-after-cancel-v9-smtp-rate-limit-safe";
 
@@ -542,9 +547,9 @@ serve(async (req) => {
     // ─── Rate-Limits (SMTP-Reputationsschutz) ───
     // Neuer SMTP-Vertrag: 150 Mails/h pro Tenant/Sender, Sendefenster 6–22 Uhr.
     // 12h-Cap = 12 × 150 = 1800. Cron läuft alle 30 Min → RUN-Cap moderat auf 8.
-    const MAX_PER_RUN_PER_TENANT = 8;
-    const MAX_PER_1H_PER_TENANT = 150;
-    const MAX_PER_12H_PER_TENANT = 1800;
+    const MAX_PER_RUN_PER_TENANT = LIMIT_RUN;
+    const MAX_PER_1H_PER_TENANT = LIMIT_1H;
+    const MAX_PER_12H_PER_TENANT = LIMIT_12H;
     const JITTER_MIN_MS = 400;
     const JITTER_MAX_MS = 1200;
     const AUTO_PAUSE_AFTER_FAILS = 3;

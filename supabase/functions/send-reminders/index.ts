@@ -18,6 +18,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import nodemailer from "https://esm.sh/nodemailer@6.9.14";
+import {
+  SEND_WINDOW_START_HOUR as WINDOW_START,
+  SEND_WINDOW_END_HOUR as WINDOW_END,
+  MAX_PER_24H_PER_TENANT as LIMIT_24H,
+  MAX_SENDS_PER_RUN_PER_TENANT as LIMIT_RUN_TYPE,
+} from "../_shared/limits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,8 +45,8 @@ const NO_BOOKING_DAYS = 7;
 // Reminder-Mails werden nur tagsüber versendet, niemals nachts.
 // Standard: 08:00–20:00 lokal (Europe/Berlin). Außerhalb → kompletter Skip.
 // Über `ignore_quiet_hours: true` im Request-Body manuell erzwingbar (Admin-Trigger).
-const QUIET_HOURS_START = 6;  // inkl. (Sendefenster startet 06:00 Europe/Berlin)
-const QUIET_HOURS_END = 22;   // exkl. (also bis 21:59 — SMTP-Vertrag 6–22 Uhr)
+const QUIET_HOURS_START = WINDOW_START;  // inkl. (Sendefenster startet 06:00 Europe/Berlin)
+const QUIET_HOURS_END = WINDOW_END;   // exkl. (also bis 21:59 — SMTP-Vertrag 6–22 Uhr)
 function berlinHour(): number {
   const h = new Intl.DateTimeFormat("de-DE", {
     timeZone: "Europe/Berlin", hour: "2-digit", hour12: false,
@@ -55,12 +61,12 @@ function isQuietHours(): boolean {
 // ─── Anti-Spam Throttling ───
 // Max. echte Sends pro Tenant + Typ und Ausführung (verhindert Burst-Send / Domain-Flagging).
 // Quiet-Hours 08–20 Uhr = 12 aktive Läufe/Tag → 50 * 12 = 600 Mails/12h/Tenant/Typ.
-const MAX_SENDS_PER_RUN_PER_TENANT = 50;
+const MAX_SENDS_PER_RUN_PER_TENANT = LIMIT_RUN_TYPE;
 // Harte Obergrenze: max. Mails pro Tenant in den letzten 24h (über alle Typen
 // zusammen). Welle-1-Update: User-Vorgabe 140/Tag/Tenant. Schützt Sender-
 // Reputation. Wird zu Beginn aus reminder_log geladen und pro erfolgreichem
 // Send live hochgezählt.
-const MAX_SENDS_PER_TENANT_PER_24H = 140;
+const MAX_SENDS_PER_TENANT_PER_24H = LIMIT_24H;
 // Eigenes Kontingent für Domain-Recovery: 20/Lauf × 12 aktive Läufe = 240/12h (real ≤200 durch Idempotenz).
 const DOMAIN_RECOVERY_CAP_PER_RUN = 20;
 // Auto-Trigger-Fenster: Recovery läuft automatisch X Tage nach Primary-Domain-Wechsel mit.
