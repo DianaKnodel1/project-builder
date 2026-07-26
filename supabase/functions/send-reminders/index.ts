@@ -499,7 +499,7 @@ async function runInvites(ctx: SendCtx) {
       continue;
     }
     if (capReached(ctx, tenant.id, "invite")) { ctx.results.push({ type: "invite", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "invite", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "invite", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "invite", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "invite", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "invite", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "invite");
     if (!gate.ok) { ctx.results.push({ type: "invite", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "invite", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "invite", gate.reason); continue; }
@@ -569,7 +569,7 @@ async function runConfirmEmail(ctx: SendCtx) {
 
     if (!hasValidSmtp(tenant)) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: "no_tenant_smtp" }); await logSkipped(ctx.admin, email, tenantId ?? null, "confirm_email", "no_tenant_smtp"); continue; }
     if (capReached(ctx, tenant.id, "confirm_email")) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "confirm_email");
     if (!gate.ok) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "confirm_email", gate.reason); continue; }
@@ -631,7 +631,7 @@ async function runCompleteRegistration(ctx: SendCtx) {
     const tenant = (p as any).tenant_id ? ctx.tenants.get((p as any).tenant_id) : null;
     if (!hasValidSmtp(tenant)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "no_tenant_smtp" }); await logSkipped(ctx.admin, email, (p as any).tenant_id ?? null, "complete_registration", "no_tenant_smtp"); continue; }
     if (capReached(ctx, tenant.id, "complete_registration")) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "complete_registration");
     if (!gate.ok) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "complete_registration", gate.reason); continue; }
@@ -706,7 +706,7 @@ async function runNoRecentBooking(ctx: SendCtx) {
       continue;
     }
     if (capReached(ctx, tenant.id, "no_recent_booking")) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "no_recent_booking");
     if (!gate.ok) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "no_recent_booking", gate.reason); continue; }
@@ -821,9 +821,9 @@ async function runDomainRecovery(ctx: SendCtx, tenantId: string, opts: { retryFa
       await logSkipped(ctx.admin, rec.email, tenant.id, "domain_recovery", "recovery_run_cap_reached");
       continue;
     }
-    if (tenant12hCapReached(ctx, tenant.id)) {
-      ctx.results.push({ type: "domain_recovery", email: rec.email, status: "skipped", error: "tenant_12h_cap_reached" });
-      await logSkipped(ctx.admin, rec.email, tenant.id, "domain_recovery", "tenant_12h_cap_reached");
+    if (tenantVolumeCapReached(ctx, tenant.id)) {
+      ctx.results.push({ type: "domain_recovery", email: rec.email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") });
+      await logSkipped(ctx.admin, rec.email, tenant.id, "domain_recovery", (ctx.lastCapReason ?? "tenant_volume_cap"));
       continue;
     }
 
