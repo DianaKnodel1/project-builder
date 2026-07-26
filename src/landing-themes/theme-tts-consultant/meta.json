@@ -70,7 +70,7 @@
     { "key": "footer_tagline", "label": "Footer Tagline", "type": "longtext", "default": "Ihr Partner für Digitalisierung, IT-Security und Datenanalyse." },
     { "key": "footer_address", "label": "Footer Adresse", "type": "longtext", "default": "" },
     { "key": "footer_email", "label": "Footer E-Mail", "type": "text", "default": "info@tts-beratung.de" },
-    { "key": "footer_phone", "label": "Footer Telefon", "type": "text", "default": "+49 (0) 123 456 789" },
+    { "key": "footer_phone", "label": "Footer Telefon", "type": "text", "default": "" },
     { "key": "impressum_url", "label": "Impressum-Link", "type": "text", "default": "impressum.html" },
     { "key": "datenschutz_url", "label": "Datenschutz-Link", "type": "text", "default": "datenschutz.html" }
   ]
