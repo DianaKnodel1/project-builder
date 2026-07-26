@@ -108,19 +108,6 @@ serve(async (req) => {
   const tMap = new Map<string, any>();
   (tenants ?? []).forEach((t: any) => tMap.set(t.id, t));
 
-  // Tageskontingent zentral aus _shared/limits.ts (2.400/Tag/Tenant) (über reminder_log + email_send_log gemessen).
-  // Pre-fetch der letzten 24h, damit Drip nicht das Cap reißt.
-  const TENANT_DAILY_CAP = MAX_PER_24H_PER_TENANT;
-  const cutoff24h = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const tenantCount24h = new Map<string, number>();
-  for (const tid of tenantIds) {
-    const [{ count: cReminder }, { count: cSend }] = await Promise.all([
-      admin.from("reminder_log").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("status", "sent").gte("sent_at", cutoff24h),
-      admin.from("email_send_log").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("status", "sent").gte("created_at", cutoff24h),
-    ]);
-    tenantCount24h.set(tid, (cReminder ?? 0) + (cSend ?? 0));
-  }
-
   let sent = 0, failed = 0, skipped = autoSkipped;
 
   for (const row of dueFiltered) {
@@ -134,17 +121,27 @@ serve(async (req) => {
       continue;
     }
 
-    // 140/Tag/Tenant Cap (Welle 1). Bei Erreichen: zurück in queued, später nochmal.
-    const current = tenantCount24h.get(row.tenant_id) ?? 0;
-    if (current >= TENANT_DAILY_CAP) {
+    // Zentrale Kontingent-/Sendefenster-Prüfung (identisch zu allen anderen
+    // Versandfunktionen). Blockaden landen als "skipped" in email_send_log und
+    // die Row geht zurück in die Queue.
+    const allowance = await guardSend({
+      admin,
+      tenantId: row.tenant_id,
+      templateName: "reminder_invite",
+      recipient: row.email,
+      kind: "reminder",
+      metadata: { source: "process-invite-resend-queue", queue_id: row.id, application_id: row.application_id },
+    });
+    if (!allowance.allowed) {
       await admin.from("invite_resend_queue").update({
         status: "queued",
-        last_error: "tenant_daily_cap_reached",
+        last_error: allowance.reason,
         scheduled_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       }).eq("id", row.id);
       skipped++;
       continue;
     }
+
     const activeDomain = t.primary_domain ?? t.domain;
     const registrationLink = activeDomain ? `https://portal.${activeDomain}/register` : "";
 
