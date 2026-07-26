@@ -224,25 +224,19 @@ function injectTrustFooter(html: string, b: z.infer<typeof BrandingSchema>): str
     </div>
     <div>
       <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px;">Anbieterkennzeichnung</div>
-      <div style="font-size:13.5px;line-height:1.75;color:#cbd5e1;">${legalItems.join("<br/>")}</div>
+      <div style="font-size:14.5px;line-height:1.8;color:#e2e8f0;">${legalItems.join("<br/>")}</div>
     </div>
     <div>
       <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px;">Rechtliches</div>
-      <ul style="list-style:none;padding:0;margin:0;font-size:14px;line-height:2;">
-        <li><a href="impressum.html" style="color:#e2e8f0;text-decoration:none;border-bottom:1px solid rgba(226,232,240,.3);">Impressum</a></li>
-        <li><a href="datenschutz.html" style="color:#e2e8f0;text-decoration:none;border-bottom:1px solid rgba(226,232,240,.3);">Datenschutzerklärung</a></li>
+      <ul style="list-style:none;padding:0;margin:0;font-size:14.5px;line-height:2;">
+        <li><a href="impressum.html" style="color:#e2e8f0;text-decoration:none;">Impressum</a></li>
+        <li><a href="datenschutz.html" style="color:#e2e8f0;text-decoration:none;">Datenschutzerklärung</a></li>
       </ul>
-      <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;">
-        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(34,197,94,.15);color:#86efac;border-radius:6px;font-size:12px;font-weight:600;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          SSL-verschlüsselt
-        </span>
-        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,.15);color:#93c5fd;border-radius:6px;font-size:12px;font-weight:600;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          DSGVO-konform
-        </span>
+      <div style="margin-top:18px;font-size:13px;line-height:1.7;color:#94a3b8;">
+        Die Übertragung Ihrer Bewerbungsdaten erfolgt TLS-verschlüsselt. Die Verarbeitung richtet sich nach unserer Datenschutzerklärung.
       </div>
     </div>
+
   </div>
   <div style="max-width:1180px;margin:32px auto 0;padding-top:20px;border-top:1px solid rgba(226,232,240,.1);font-size:12.5px;color:#94a3b8;text-align:center;">
     © ${year} ${esc(b.firmenname)}. Alle Rechte vorbehalten.
