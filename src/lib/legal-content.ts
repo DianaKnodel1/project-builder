@@ -44,6 +44,33 @@ export function escapeHtml(s: unknown): string {
   );
 }
 
+/**
+ * Erkennt Muster-/Demo-Daten aus Theme-Defaults ("Musterstraße 1",
+ * "hallo@example.com", "+49 30 12345678", …). Solche Werte dürfen NIE auf einer
+ * echten Kunden-Landing landen — sie werden verworfen, damit stattdessen die
+ * gepflegten Firmendaten greifen.
+ */
+export function isPlaceholderValue(v: unknown): boolean {
+  const s = String(v ?? "").trim();
+  if (!s) return true;
+  const patterns = [
+    /musterstra/i,
+    /musterstadt/i,
+    /mustermann/i,
+    /\bmusterfirma\b/i,
+    /\bbeispiel(firma|stadt|str)/i,
+    /example\.(com|org|net|de)/i,
+    /\+49\s*\(?\s*0?\s*\)?\s*123\s*456\s*789/,
+    /\+49\s*30\s*12345678\b/,
+    /\+49\s*30\s*000\s*000\s*00\b/,
+    /\+49\s*30\s*123\s*456\s*78\b/,
+    /\b12345\s+Musterstadt\b/i,
+  ];
+  return patterns.some((re) => re.test(s));
+}
+
+
+
 function addressLines(b: LegalBranding): string[] {
   const plzStadt = [b.plz, b.stadt].filter(Boolean).join(" ");
   return [b.strasse, plzStadt].filter(Boolean).map((x) => escapeHtml(x));
