@@ -24,7 +24,12 @@ CONF_FILE="$REPO_DIR/scripts/backend-server.env"
 : "${BACKEND_SUPABASE_DIR:=/opt/supabase}"
 
 SSH="ssh -o StrictHostKeyChecking=accept-new ${BACKEND_USER}@${BACKEND_HOST}"
-ENV_FILE="${BACKEND_SUPABASE_DIR}/docker/.env"
+# BACKEND_SUPABASE_DIR kann /opt/supabase oder /opt/supabase/docker sein
+case "$BACKEND_SUPABASE_DIR" in
+  */docker) ENV_FILE="${BACKEND_SUPABASE_DIR}/.env" ;;
+  *)        ENV_FILE="${BACKEND_SUPABASE_DIR}/docker/.env" ;;
+esac
+
 
 echo "▸ Setze Auth-Link-Gültigkeit auf ${EXP}s auf ${BACKEND_HOST}"
 

@@ -45,6 +45,13 @@ export const deleteEmployeeAccount = createServerFn({ method: "POST" })
       }
     }
 
+    // 1b) Termine/Buchungen des Mitarbeiters löschen (bookings.user_id hat keinen FK)
+    try {
+      await sb.from("bookings").delete().eq("user_id", uid);
+    } catch (e) {
+      console.warn("Bookings-Cleanup fehlgeschlagen:", e);
+    }
+
     // 2) Dynamisches Cascade-Cleanup via RPC (findet alle FKs auf auth.users)
     const { error: rpcErr } = await sb.rpc("admin_delete_user_cascade", {
       _user_id: uid,
@@ -243,6 +250,7 @@ export const purgeInactivePeople = createServerFn({ method: "POST" })
             }
           } catch {}
         }
+        try { await sb.from("bookings").delete().eq("user_id", uid); } catch {}
         const { error: rpcErr } = await sb.rpc("admin_delete_user_cascade", {
           _user_id: uid,
           _actor_id: context.userId,
@@ -338,6 +346,7 @@ export const bulkDeleteEmployees = createServerFn({ method: "POST" })
             }
           } catch {}
         }
+        try { await sb.from("bookings").delete().eq("user_id", uid); } catch {}
         const { error: rpcErr } = await sb.rpc("admin_delete_user_cascade", {
           _user_id: uid,
           _actor_id: context.userId,
