@@ -9,7 +9,8 @@ let out = src
   // Typ-Deklarationen entfernen
   .replace(/export type [A-Za-z]+ = \{[\s\S]*?\n\};\n\n?/g, "")
   // Parameter-/Rückgabe-Annotationen
-  .replace(/\(s: unknown\)/g, "(s)")
+  .replace(/\((?:s|v): unknown\)/g, (m) => (m.includes("v:") ? "(v)" : "(s)"))
+  .replace(/\): boolean \{/g, ") {")
   .replace(/\(b: LegalBranding\): string\[\]/g, "(b)")
   .replace(/\(b: LegalBranding = \{\}\)/g, "(b = {})")
   .replace(/b: LegalBranding = \{\},/g, "b = {},")
