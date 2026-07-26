@@ -104,7 +104,7 @@ function applyPlaceholders(
   if (branding.ust_id) legalLines.push(`USt-IdNr.: ${esc(branding.ust_id)}`);
   else if (branding.steuernummer) legalLines.push(`Steuernummer: ${esc(branding.steuernummer)}`);
   const legalBlock = legalLines.length
-    ? `<div class="lv-legal-block" style="font-size:14px;line-height:1.65;color:inherit;opacity:.9;">${legalLines.join("<br/>")}</div>`
+    ? `<div class="lv-legal-block" style="font-size:14.5px;line-height:1.75;color:inherit;">${legalLines.join("<br/>")}</div>`
     : "";
   const legalInlineParts = [
     branding.firmenname,
