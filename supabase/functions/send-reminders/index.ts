@@ -220,21 +220,56 @@ serve(async (req) => {
       tenants.set(t.id, t as TenantRow);
     });
 
-    const ctx: SendCtx = { admin, tenants, dryRun, onlyEmail, results: [], sentCountByTenantType: new Map(), sentCountByTenant12h: new Map(), recoveryStats: new Map() };
+    const ctx: SendCtx = {
+      admin, tenants, dryRun, onlyEmail, results: [],
+      sentCountByTenantType: new Map(),
+      sentCountByTenant1h: new Map(),
+      sentCountByTenant12h: new Map(),
+      sentCountByTenant24h: new Map(),
+      lastCapReason: null,
+      recoveryStats: new Map(),
+    };
 
-    // 24h-Cap pro Tenant vorladen (alle bisherigen sent in den letzten 24h).
+    // Kontingente pro Tenant vorladen: 1h / 12h / 24h.
+    // Zwei Quellen (reminder_log + email_send_log) protokollieren dieselben
+    // Reminder-Mails, deshalb pro Fenster das MAXIMUM (nicht die Summe) nehmen —
+    // sonst würde jeder Reminder doppelt gegen das Kontingent zählen.
     {
-      const cutoff24h = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const { data: recent } = await admin
-        .from("reminder_log")
-        .select("tenant_id")
-        .eq("status", "sent")
-        .gte("sent_at", cutoff24h);
-      for (const r of (recent ?? []) as Array<{ tenant_id: string | null }>) {
-        if (!r.tenant_id) continue;
-        ctx.sentCountByTenant12h.set(r.tenant_id, (ctx.sentCountByTenant12h.get(r.tenant_id) ?? 0) + 1);
-      }
+      const now = Date.now();
+      const cutoff24h = new Date(now - 24 * 3600_000).toISOString();
+      const cutoff12h = now - 12 * 3600_000;
+      const cutoff1h = now - 3600_000;
+
+      const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
+      const tally = (rows: Array<{ tenant_id: string | null; ts: string | null }>) => {
+        const c1 = new Map<string, number>(), c12 = new Map<string, number>(), c24 = new Map<string, number>();
+        for (const r of rows) {
+          if (!r.tenant_id || !r.ts) continue;
+          const t = new Date(r.ts).getTime();
+          bump(c24, r.tenant_id);
+          if (t >= cutoff12h) bump(c12, r.tenant_id);
+          if (t >= cutoff1h) bump(c1, r.tenant_id);
+        }
+        return { c1, c12, c24 };
+      };
+
+      const [{ data: remRows }, { data: logRows }] = await Promise.all([
+        admin.from("reminder_log").select("tenant_id, sent_at").eq("status", "sent").gte("sent_at", cutoff24h),
+        admin.from("email_send_log").select("tenant_id, created_at").in("status", COUNTING_STATUSES).gte("created_at", cutoff24h),
+      ]);
+
+      const a = tally(((remRows ?? []) as any[]).map(r => ({ tenant_id: r.tenant_id, ts: r.sent_at })));
+      const b = tally(((logRows ?? []) as any[]).map(r => ({ tenant_id: r.tenant_id, ts: r.created_at })));
+      const merge = (target: Map<string, number>, x: Map<string, number>, y: Map<string, number>) => {
+        for (const id of new Set([...x.keys(), ...y.keys()])) {
+          target.set(id, Math.max(x.get(id) ?? 0, y.get(id) ?? 0));
+        }
+      };
+      merge(ctx.sentCountByTenant1h, a.c1, b.c1);
+      merge(ctx.sentCountByTenant12h, a.c12, b.c12);
+      merge(ctx.sentCountByTenant24h, a.c24, b.c24);
     }
+
 
     if (mode === "domain_recovery") {
       if (!recoveryTenantId) return json({ error: "tenant_id required for domain_recovery" }, 400);
