@@ -62,11 +62,16 @@ function isQuietHours(): boolean {
 // Max. echte Sends pro Tenant + Typ und Ausführung (verhindert Burst-Send / Domain-Flagging).
 // Quiet-Hours 08–20 Uhr = 12 aktive Läufe/Tag → 50 * 12 = 600 Mails/12h/Tenant/Typ.
 const MAX_SENDS_PER_RUN_PER_TENANT = LIMIT_RUN_TYPE;
-// Harte Obergrenze: max. Mails pro Tenant in den letzten 24h (über alle Typen
-// zusammen). Welle-1-Update: User-Vorgabe 140/Tag/Tenant. Schützt Sender-
-// Reputation. Wird zu Beginn aus reminder_log geladen und pro erfolgreichem
-// Send live hochgezählt.
+// Harte Obergrenzen pro Tenant über alle Typen zusammen (zentral in
+// _shared/limits.ts): 150/h (SMTP-Vertrag), 1.800/12h, 2.400/24h.
+// Werden zu Beginn aus reminder_log + email_send_log geladen und pro
+// erfolgreichem Send live hochgezählt.
+const MAX_SENDS_PER_TENANT_PER_1H = LIMIT_1H;
+const MAX_SENDS_PER_TENANT_PER_12H = LIMIT_12H;
 const MAX_SENDS_PER_TENANT_PER_24H = LIMIT_24H;
+/** Status-Werte in email_send_log, die als echter Versand gegen die Kappen zählen. */
+const COUNTING_STATUSES = ["sent", "pending", "bounced", "complained"];
+
 // Eigenes Kontingent für Domain-Recovery: 20/Lauf × 12 aktive Läufe = 240/12h (real ≤200 durch Idempotenz).
 const DOMAIN_RECOVERY_CAP_PER_RUN = 20;
 // Auto-Trigger-Fenster: Recovery läuft automatisch X Tage nach Primary-Domain-Wechsel mit.
