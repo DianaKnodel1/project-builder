@@ -127,12 +127,23 @@ function applyPlaceholders(
     contact_address: addrParts,
     contact_email: (b.email as string) || "",
     contact_phone: (b.telefon as string) || "",
+    footer_address: addrParts,
+    footer_email: (b.email as string) || "",
+    footer_phone: (b.telefon as string) || "",
     sitz_stadt: (b.stadt as string) || "",
     legal_block: legalBlock,
     legal_inline: legalInlineParts,
     contact_block: contactBlock,
   };
-  const merged: Record<string, unknown> = { ...aliases, ...b, ...slotValues };
+  // Muster-/Demo-Werte aus Theme-Defaults verwerfen, damit keine Fantasie-Adressen
+  // auf einer echten Landing landen — die echten Firmendaten greifen dann.
+  const cleanSlots: Record<string, string> = {};
+  for (const [key, value] of Object.entries(slotValues)) {
+    if (key in aliases && isPlaceholderValue(value)) continue;
+    cleanSlots[key] = value;
+  }
+  const merged: Record<string, unknown> = { ...aliases, ...b, ...cleanSlots };
+
   let out = src;
   // Mehrere Passes: Slot-Werte können selbst {{branding}}-Tokens enthalten.
   for (let i = 0; i < 3; i++) {
