@@ -1457,6 +1457,18 @@ document.addEventListener('submit', function(e){
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {impressumMissing.length > 0 && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                  <p className="font-medium text-amber-700 dark:text-amber-400">
+                    Impressum unvollständig — rechtlich erforderliche Angaben fehlen:
+                  </p>
+                  <p className="mt-1 text-muted-foreground">{impressumMissing.join(" · ")}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Bitte in Schritt „Firmendaten" ergänzen. Fehlende Felder werden im Impressum weggelassen.
+                  </p>
+                </div>
+              )}
+
               <Field label="Interner Slug (a-z, 0-9, -) — leer = aus Domain generieren">
                 <Input
                   value={slug}
