@@ -432,15 +432,30 @@ function capReached(ctx: SendCtx, tenantId: string, type: ReminderType): boolean
   const key = `${tenantId}:${type}`;
   return (ctx.sentCountByTenantType.get(key) ?? 0) >= MAX_SENDS_PER_RUN_PER_TENANT;
 }
-// 24h-Obergrenze pro Tenant über alle Reminder-Typen (Welle-1-Cap: 140/Tag).
-function tenant12hCapReached(ctx: SendCtx, tenantId: string): boolean {
-  return (ctx.sentCountByTenant12h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_24H;
+/**
+ * Zentrale Volumen-Kappen pro Tenant über ALLE Reminder-Typen:
+ * 150/h, 1.800/12h, 2.400/24h (Werte aus _shared/limits.ts).
+ * Setzt ctx.lastCapReason, damit Log und Result den echten Grund zeigen.
+ */
+function tenantVolumeCapReached(ctx: SendCtx, tenantId: string): boolean {
+  ctx.lastCapReason = null;
+  if ((ctx.sentCountByTenant1h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_1H) {
+    ctx.lastCapReason = "tenant_1h_cap";
+  } else if ((ctx.sentCountByTenant12h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_12H) {
+    ctx.lastCapReason = "tenant_12h_cap";
+  } else if ((ctx.sentCountByTenant24h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_24H) {
+    ctx.lastCapReason = "tenant_24h_cap";
+  }
+  return ctx.lastCapReason !== null;
 }
 function bumpSent(ctx: SendCtx, tenantId: string, type: ReminderType) {
   const key = `${tenantId}:${type}`;
   ctx.sentCountByTenantType.set(key, (ctx.sentCountByTenantType.get(key) ?? 0) + 1);
+  ctx.sentCountByTenant1h.set(tenantId, (ctx.sentCountByTenant1h.get(tenantId) ?? 0) + 1);
   ctx.sentCountByTenant12h.set(tenantId, (ctx.sentCountByTenant12h.get(tenantId) ?? 0) + 1);
+  ctx.sentCountByTenant24h.set(tenantId, (ctx.sentCountByTenant24h.get(tenantId) ?? 0) + 1);
 }
+
 
 // Schreibt einen Eintrag in email_send_log (zentrale Logs-Tabelle, die das
 // Admin-UI /admin/email-logs anzeigt). Enthält gerendertes Subject/HTML und
