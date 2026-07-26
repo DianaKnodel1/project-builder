@@ -131,11 +131,16 @@ interface SendCtx {
   results: { type: ReminderType; email: string; status: string; error?: string }[];
   // Key: `${tenantId}:${reminderType}`
   sentCountByTenantType: Map<string, number>;
-  // Live-Zähler: Mails pro Tenant in den letzten 12h (alle Typen, inkl. heutigem Lauf).
+  // Live-Zähler pro Tenant (alle Typen, inkl. laufendem Run) je Zeitfenster.
+  sentCountByTenant1h: Map<string, number>;
   sentCountByTenant12h: Map<string, number>;
+  sentCountByTenant24h: Map<string, number>;
+  /** Grund der letzten Kappen-Blockade (für Log/Result). */
+  lastCapReason: string | null;
   // Recovery-spezifische Vorschau-Zähler (pro Tenant aggregiert):
   recoveryStats: Map<string, { total_eligible: number; would_send_this_run: number; already_done_since_change: number; no_change_anchor: boolean }>;
 }
+
 
 // Auth-Gate: nur Cron (mit CRON_SECRET) oder eingeloggter Admin dürfen triggern.
 async function authorize(req: Request, admin: any): Promise<{ ok: true } | { ok: false; status: number; msg: string }> {
