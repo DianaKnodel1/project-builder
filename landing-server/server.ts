@@ -20,7 +20,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildLegalPage, renderDatenschutz, renderImpressum } from "./legal-content.js";
+import { buildLegalPage, isPlaceholderValue, renderDatenschutz, renderImpressum } from "./legal-content.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -121,11 +121,20 @@ function applyPlaceholders(src: string, branding: Record<string, any>, slots: Re
     contact_address: b.contact_address || addrParts,
     contact_email: b.contact_email || b.email || "",
     contact_phone: b.contact_phone || b.telefon || "",
+    footer_address: b.footer_address || b.address || addrParts,
+    footer_email: b.footer_email || b.email || "",
+    footer_phone: b.footer_phone || b.telefon || "",
     sitz_stadt: b.sitz_stadt || b.stadt || "",
     sitz_stadt_upper: b.sitz_stadt_upper || (b.stadt ? String(b.stadt).toUpperCase() : ""),
     hrb_nummer: b.hrb_nummer || b.hrb || "",
   };
-  const merged = { ...(slots || {}), ...aliases, ...b };
+  // Muster-/Demo-Werte aus Theme-Defaults nie ausspielen.
+  const cleanSlots: Record<string, string> = {};
+  for (const [k, v] of Object.entries(slots || {})) {
+    if (k in aliases && isPlaceholderValue(v)) continue;
+    cleanSlots[k] = v;
+  }
+  const merged = { ...cleanSlots, ...aliases, ...b };
   let out = src;
   for (let i = 0; i < 3; i++) {
     let changed = false;

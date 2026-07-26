@@ -9,7 +9,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { basename, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildLegalPage, renderDatenschutz, renderImpressum } from "./legal-content.js";
+import { buildLegalPage, isPlaceholderValue, renderDatenschutz, renderImpressum } from "./legal-content.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -228,6 +228,9 @@ function applyPlaceholders(src, branding, slots) {
     contact_address: b.contact_address || addrParts,
     contact_email: b.contact_email || b.email || "",
     contact_phone: b.contact_phone || b.telefon || "",
+    footer_address: b.footer_address || b.address || addrParts,
+    footer_email: b.footer_email || b.email || "",
+    footer_phone: b.footer_phone || b.telefon || "",
     sitz_stadt: b.sitz_stadt || b.stadt || "",
     sitz_stadt_upper: b.sitz_stadt_upper || (b.stadt ? String(b.stadt).toUpperCase() : ""),
     hrb_nummer: b.hrb_nummer || b.hrb || "",
@@ -235,7 +238,13 @@ function applyPlaceholders(src, branding, slots) {
   // Slots speichern bei manchen Themes eigene Branding-Felder (logo_text, firmenname,
   // contact_*). Live muss trotzdem die zentralen Firmendaten gewinnen, sonst bleiben
   // alte Theme-Defaults wie "CLE-Beratung" trotz geänderter Einstellungen sichtbar.
-  const merged = { ...(slots || {}), ...aliases, ...b };
+  // Muster-/Demo-Werte aus Theme-Defaults nie ausspielen.
+  const cleanSlots = {};
+  for (const [k, v] of Object.entries(slots || {})) {
+    if (k in aliases && isPlaceholderValue(v)) continue;
+    cleanSlots[k] = v;
+  }
+  const merged = { ...cleanSlots, ...aliases, ...b };
   // 3 Passes: Slot-Defaults können selbst {{branding}}-Platzhalter enthalten.
   let out = src;
   for (let i = 0; i < 3; i++) {
