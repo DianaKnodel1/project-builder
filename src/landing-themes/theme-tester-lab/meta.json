@@ -60,7 +60,7 @@
     { "key": "tier3_b3",        "label": "Vollzeit Vorteil 3","type": "text",     "default": "Karriereperspektive" },
 
     { "key": "contact_email",   "label": "Footer E-Mail",     "type": "text",     "default": "kontakt@tester-lab.de" },
-    { "key": "contact_phone",   "label": "Footer Telefon",    "type": "text",     "default": "+49 30 12345678" },
+    { "key": "contact_phone",   "label": "Footer Telefon",    "type": "text",     "default": "" },
     { "key": "impressum_url",   "label": "Impressum-URL",     "type": "text",     "default": "impressum.html" },
     { "key": "datenschutz_url", "label": "Datenschutz-URL",   "type": "text",     "default": "datenschutz.html" }
   ]
