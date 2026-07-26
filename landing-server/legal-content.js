@@ -12,7 +12,7 @@ export const LEGAL_CONTENT_VERSION = "2026-07-26.1";
 
 export function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]),
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
 }
 

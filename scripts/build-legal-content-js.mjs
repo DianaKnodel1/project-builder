@@ -19,7 +19,7 @@ let out = src
   .replace(/\): string \{/g, ") {")
   .replace(/: string\[\] = \[\]/g, " = []")
   .replace(/const out: string\[\]/g, "const out")
-  .replace(/\)\[c\]!,/g, ")[c]),")
+  .replace(/\)\[c\]!,/g, ")[c],")
   .replace(/b\.primary_color!/g, "b.primary_color")
   .replace(/\(b\.primary_color \?\? ""\)/g, '(b.primary_color || "")')
   .replace(/^export const LEGAL_CONTENT_VERSION/m, "export const LEGAL_CONTENT_VERSION");
