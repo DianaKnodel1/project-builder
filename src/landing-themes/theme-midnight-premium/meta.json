@@ -109,6 +109,6 @@
     { "key": "seo_description", "label": "SEO Beschreibung", "type": "text", "default": "Strategie, Design und Engineering für ambitionierte Marken. Digitale Produkte, Websites und Portale, die bleiben." },
     { "key": "seo_image", "label": "SEO Bild (Social Preview)", "type": "text", "default": "" },
     { "key": "favicon_image", "label": "Favicon", "type": "text", "default": "" },
-    { "key": "landing_domain", "label": "Landing Domain", "type": "text", "default": "example.com" }
+    { "key": "landing_domain", "label": "Landing Domain", "type": "text", "default": "" }
   ]
 }

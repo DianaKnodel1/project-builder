@@ -20,6 +20,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildLegalPage, isPlaceholderValue, renderDatenschutz, renderImpressum } from "./legal-content.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -120,11 +121,20 @@ function applyPlaceholders(src: string, branding: Record<string, any>, slots: Re
     contact_address: b.contact_address || addrParts,
     contact_email: b.contact_email || b.email || "",
     contact_phone: b.contact_phone || b.telefon || "",
+    footer_address: b.footer_address || b.address || addrParts,
+    footer_email: b.footer_email || b.email || "",
+    footer_phone: b.footer_phone || b.telefon || "",
     sitz_stadt: b.sitz_stadt || b.stadt || "",
     sitz_stadt_upper: b.sitz_stadt_upper || (b.stadt ? String(b.stadt).toUpperCase() : ""),
     hrb_nummer: b.hrb_nummer || b.hrb || "",
   };
-  const merged = { ...(slots || {}), ...aliases, ...b };
+  // Muster-/Demo-Werte aus Theme-Defaults nie ausspielen.
+  const cleanSlots: Record<string, string> = {};
+  for (const [k, v] of Object.entries(slots || {})) {
+    if (k in aliases && isPlaceholderValue(v)) continue;
+    cleanSlots[k] = v;
+  }
+  const merged = { ...cleanSlots, ...aliases, ...b };
   let out = src;
   for (let i = 0; i < 3; i++) {
     let changed = false;
@@ -202,52 +212,8 @@ function cleanEmptyMeta(html: string, branding: Record<string, any>, domain: str
   return out;
 }
 
-function escapeHtml(s: string): string {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
-
-function renderImpressum(b: Record<string, any> = {}): string {
-  const addr = [b.strasse, [b.plz, b.stadt].filter(Boolean).join(" ")].filter(Boolean).map(escapeHtml).join("<br/>");
-  const rows: string[] = [];
-  rows.push(`<p><strong>${escapeHtml(b.firmenname)}</strong>${addr ? `<br/>${addr}` : ""}</p>`);
-  if (b.geschaeftsfuehrer) rows.push(`<p><strong>Vertreten durch:</strong><br/>${escapeHtml(b.geschaeftsfuehrer)}</p>`);
-  const contact: string[] = [];
-  if (b.telefon) contact.push(`Telefon: <a href="tel:${escapeHtml(b.telefon)}">${escapeHtml(b.telefon)}</a>`);
-  if (b.email) contact.push(`E-Mail: <a href="mailto:${escapeHtml(b.email)}">${escapeHtml(b.email)}</a>`);
-  if (contact.length) rows.push(`<h3>Kontakt</h3><p>${contact.join("<br/>")}</p>`);
-  const reg: string[] = [];
-  if (b.registergericht) reg.push(`Registergericht: ${escapeHtml(b.registergericht)}`);
-  if (b.hrb) reg.push(`Registernummer: ${escapeHtml(b.hrb)}`);
-  if (reg.length) rows.push(`<h3>Registereintrag</h3><p>${reg.join("<br/>")}</p>`);
-  const tax: string[] = [];
-  if (b.ust_id) tax.push(`USt-IdNr.: ${escapeHtml(b.ust_id)}`);
-  if (b.steuernummer) tax.push(`Steuernummer: ${escapeHtml(b.steuernummer)}`);
-  if (tax.length) rows.push(`<h3>Umsatzsteuer</h3><p>${tax.join("<br/>")}</p>`);
-  if (b.impressum) rows.push(`<div>${b.impressum}</div>`);
-  return rows.join("\n");
-}
-
-function renderDatenschutz(b: Record<string, any> = {}): string {
-  const name = escapeHtml(b.firmenname);
-  const email = escapeHtml(b.email);
-  const address = [b.strasse, [b.plz, b.stadt].filter(Boolean).join(" ")].filter(Boolean).map(escapeHtml).join("<br/>");
-  return `
-    <h3>1. Verantwortlicher</h3>
-    <p>Verantwortlich für die Datenverarbeitung auf dieser Website ist:<br/>${name}${address ? `<br/>${address}` : ""}${email ? `<br/>E-Mail: <a href="mailto:${email}">${email}</a>` : ""}</p>
-    <h3>2. Bewerbungsdaten</h3>
-    <p>Bei einer Bewerbung über unsere Website verarbeiten wir die von Ihnen angegebenen Daten ausschließlich zur Bearbeitung Ihrer Bewerbung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO sowie § 26 BDSG.</p>
-    <h3>3. Speicherdauer</h3>
-    <p>Ihre Bewerbungsdaten werden bis zu 6 Monate nach Abschluss des Verfahrens gespeichert und anschließend gelöscht, sofern keine längere Aufbewahrungspflicht besteht oder Sie in eine längere Speicherung eingewilligt haben.</p>
-    <h3>4. Ihre Rechte</h3>
-    <p>Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Widerspruch. Anfragen richten Sie bitte an ${email ? `<a href="mailto:${email}">${email}</a>` : name}.</p>
-  `;
-}
-
-function buildLegalPage(title: string, body: string, row: LandingRow): string {
-  const firm = escapeHtml(row.branding?.firmenname || row.domain || "");
-  const t = escapeHtml(title);
-  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>${t} – ${firm}</title><meta name="robots" content="noindex,follow"/><link rel="stylesheet" href="/style.css?v=${encodeURIComponent(ASSET_VERSION)}"/><style>.legal-page{max-width:820px;margin:0 auto;padding:64px 24px 96px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1a1a1a;line-height:1.7}.legal-page h1{font-size:36px;margin:0 0 8px}.legal-page h3{font-size:18px;margin:28px 0 8px}.legal-page p{margin:0 0 12px}.legal-page a{color:#2563eb}.legal-back{display:inline-block;margin-bottom:24px;color:#64748b;text-decoration:none;font-size:14px}.legal-footer{max-width:820px;margin:0 auto;padding:24px;border-top:1px solid #e5e7eb;font-size:13px;color:#64748b;text-align:center}</style></head><body><main class="legal-page"><a href="/" class="legal-back">← Zurück zur Startseite</a><h1>${t}</h1>${body}</main><footer class="legal-footer">© ${new Date().getFullYear()} ${firm} · <a href="/impressum.html">Impressum</a> · <a href="/datenschutz.html">Datenschutz</a></footer></body></html>`;
-}
+// Rechtstexte zentral aus ./legal-content.js (Mirror von src/lib/legal-content.ts).
+// Neu erzeugen mit: bun scripts/build-legal-content-js.mjs
 
 function versionThemeAssets(html: string): string {
   const v = encodeURIComponent(ASSET_VERSION);
@@ -276,8 +242,14 @@ function renderHtml(row: LandingRow, host: string): { body: string; status: numb
 }
 
 function renderLegal(row: LandingRow, type: "impressum" | "datenschutz"): string {
-  const body = type === "datenschutz" ? renderDatenschutz(row.branding || {}) : renderImpressum(row.branding || {});
-  return buildLegalPage(type === "datenschutz" ? "Datenschutz" : "Impressum", body, row);
+  const branding = row.branding || {};
+  const body = type === "datenschutz" ? renderDatenschutz(branding) : renderImpressum(branding);
+  return buildLegalPage(type === "datenschutz" ? "Datenschutz" : "Impressum", body, branding, {
+    homeHref: "/",
+    impressumHref: "/impressum.html",
+    datenschutzHref: "/datenschutz.html",
+    logoUrl: row.logo_url ? "/assets/logo" : undefined,
+  });
 }
 
 function renderCss(row: LandingRow): string {

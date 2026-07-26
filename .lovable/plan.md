@@ -1,45 +1,51 @@
-## Teil 1 — Was sind die zentralen Limits?
+## Befund der Prüfung
 
-Alle Zahlen stehen an genau einer Stelle: `supabase/functions/_shared/limits.ts`. Ändert man sie dort, gilt das für alle Versandfunktionen.
+Ich habe alle 21 Themes, den ZIP-Generator, den Live-Renderer und die Theme-Defaults durchgesehen. Die Impressen sind nicht "kaputt", aber an vier Stellen wirken sie unprofessionell:
 
-| Wert | Aktuell | Bedeutung |
-|---|---|---|
-| Sendefenster | 06:00–22:00 Berlin | Reminder/Kampagnen senden nur in diesem Fenster. Transaktionale Mails (Bestätigung, Passwort-Reset, Terminbestätigung, Einladung) ignorieren das Fenster bewusst. |
-| Pro Stunde / Mandant | 150 | Harte Grenze des SMTP-Vertrags. |
-| Pro 12 Stunden / Mandant | 1.800 | Zwischen-Puffer (12 × 150). |
-| Pro Tag / Mandant | 2.400 | 16 Sendestunden × 150. |
-| Bewerber-Reminder pro Cron-Lauf | 10 | Cron alle 5 Min → max. 120/h, bleibt unter 150. |
-| Onboarding-Reminder pro Lauf, Mandant und Typ | 50 | Verhindert Burst-Versand. |
+**1. Drei unterschiedliche Impressum-Versionen im Umlauf**
+- `src/lib/landing-generator.functions.ts` (ZIP-Download) — 7 Datenschutz-Abschnitte + § 18 MStV
+- `landing-server/server.ts` (Live-Seiten) — nur 4 Datenschutz-Abschnitte, **kein** § 18 MStV
+- `landing-server/server.js` (die tatsächlich laufende Datei) — eigene Kopie derselben Logik
 
-## Teil 2 — Logging und Statistik, einfach erklärt
+Ergebnis: Die live ausgelieferte Seite hat ein dünneres Impressum als das ZIP. Was der Kunde im Generator sieht, ist nicht das, was online steht.
 
-**Jede Entscheidung wird protokolliert.** Es gibt eine Tabelle (`email_send_log`), in die jede Mail einen Eintrag schreibt — egal wie es ausgeht:
-- `sent` = raus
-- `failed` = Versand fehlgeschlagen
-- `pending` = unterwegs / Wiederholung offen
-- `skipped` = absichtlich nicht gesendet (z. B. Limit erreicht, Mandant pausiert, außerhalb Sendefenster) — mit Grund und Zählerstand
+**2. Die Rechtsseiten sehen aus wie ungestylte Rohtexte**
+`buildLegalPage()` erzeugt eine weiße Seite mit `system-ui`, ohne Logo, ohne Markenfarbe, ohne die Navigation/Footer des Themes. Für ein Theme wie „Midnight Premium" oder „Editorial Premium" ist der Bruch drastisch — genau das wirkt unseriös. Zusätzlich wird per `html, body { background:#fff !important }` das Theme-CSS überschrieben.
 
-Daraus baut das Mail-Center: Gesamtvolumen, Balken pro Tag, Aufteilung pro Mandant, CSV-Export.
+**3. Inhaltlich unvollständig für ein deutsches Impressum**
+Es fehlen durchgehend: Haftungsausschluss für Inhalte (§ 7 DDG) und Links, Urheberrechtshinweis, EU-Streitschlichtung/ODR-Hinweis + VSBG-Erklärung, Aufsichtsbehörde/AÜG-Erlaubnis (bei Personalvermittlung relevant), Verantwortlicher nach § 18 Abs. 2 MStV (live fehlt er ganz). Die § 18-Zeile steht im ZIP zudem in 70 % Opazität — sieht nach Kleingedrucktem aus.
 
-**Warum „dedupliziert"?** Eine Mail kann mehrere Zeilen erzeugen: erst `pending`, dann `sent`. Ohne Bereinigung würde dieselbe Mail zweimal gezählt. Die Statistik gruppiert deshalb nach *Mandant + Vorlage + Empfänger + Tag* und behält nur den „endgültigsten" Zustand: `sent`/`failed`/`bounced` gewinnen immer gegen `pending`, bei Gleichstand der neuere Eintrag. Ergebnis: 1 Versand = 1 Zeile in der Statistik, und die Erfolgsquote wird nur aus abgeschlossenen Versänden gerechnet (offene Retries drücken sie nicht künstlich).
+**4. Musterdaten und Werbe-Badges**
+- Theme-Defaults enthalten `Musterstraße 1 / 12345 Musterstadt`, `+49 (0) 123 456 789`, `+49 30 12345678`, `hallo@example.com`, `example.com` (u. a. TTS-Consultant, Tester-Lab, QA-Grid, Job-Gleiter, Mirror-Site, Quantum-Tech, Nebula-Flux, Editorial/Midnight/QA-Platform-Premium). Werden Footer-Slots nicht überschrieben, stehen Fantasie-Adressen auf der Live-Seite — der schlimmste Seriositätskiller.
+- Der injizierte Trust-Footer hängt grüne Badges „SSL-verschlüsselt" / „DSGVO-konform" neben die Anbieterkennzeichnung. Das wirkt werblich statt sachlich.
 
-## Teil 3 — Prüfung: drei echte Lücken gefunden
+## Umsetzungsplan
 
-Die Prüfung hat drei Stellen ergeben, an denen der Anspruch „nichts reißt 150/h" heute noch nicht sauber gehalten wird:
+**A. Eine gemeinsame Quelle für Rechtstexte**
+Neues Modul `src/lib/legal-content.ts` mit `renderImpressum()`, `renderDatenschutz()` und `buildLegalPage()`. ZIP-Generator importiert es direkt; `landing-server/server.ts`/`server.js` bekommen die identischen Texte gespiegelt (der Landing-Server läuft eigenständig auf dem VPS und kann nicht aus `src/` importieren) — mit Versionsmarker im Kommentar, damit Abweichungen auffallen.
 
-1. **`send-reminders` hat keine Stunden-Grenze.** Es prüft nur 50 pro Lauf/Mandant/Typ und die Tagesgrenze. Bei 5 Reminder-Typen sind das bis zu 250 Mails in einem einzigen Lauf — über 150/h, obwohl die Tagesgrenze noch nicht erreicht ist.
-2. **Falsch benannte Kappe in `send-reminders`.** Die Funktion `tenant12hCapReached` prüft gegen den 24h-Wert (2.400), nicht gegen 1.800. Wirkt harmlos, macht aber jede Fehlersuche irreführend, und die Meldung im Log heißt fälschlich `tenant_12h_cap_reached`.
-3. **`process-invite-resend-queue` zählt zu optimistisch.** Es zählt nur `sent`, während der zentrale Guard `sent`, `pending`, `bounced`, `complained` zählt. Dadurch kann diese Queue die Kontingente überschreiten. Zusätzlich prüft sie gar keine Stunden-Grenze und hat ein eigenes Quiet-Hours-Fenster (05–23) statt des zentralen 06–22.
+**B. Impressum inhaltlich vervollständigen**
+Struktur nach Standard: Angaben gemäß § 5 DDG → Vertretungsberechtigte → Kontakt → Registereintrag → Umsatzsteuer-ID → Aufsichtsbehörde/Erlaubnis (nur wenn gepflegt) → Redaktionell verantwortlich (§ 18 Abs. 2 MStV, in normaler Schriftgröße) → Freitext des Kunden → Haftung für Inhalte → Haftung für Links → Urheberrecht → EU-Streitschlichtung + VSBG-Hinweis. Leere Felder erzeugen keine leeren Überschriften.
 
-## Umsetzung
+**C. Datenschutz auf einen Stand bringen**
+Live-Version bekommt dieselben 7 Abschnitte wie das ZIP, ergänzt um Hosting/Server-Logfiles und Cookies/Tracking-Hinweis; identisch in beiden Pfaden.
 
-- **`send-reminders`**: 1h-Zähler pro Mandant beim Lauf-Start aus `email_send_log` laden (gleiche Status-Liste wie der Guard) und vor jedem Send prüfen; Skip als `tenant_1h_cap` loggen. Die 12h-Prüfung auf den echten 12h-Wert korrigieren und den Log-Grund entsprechend benennen.
-- **`process-invite-resend-queue`**: die eigene Zähl-/Fenster-Logik durch `guardSend` aus `_shared/send-guard.ts` ersetzen (Kind `reminder`), sodass Stunden-, Tages- und Fenster-Regeln identisch gelten und Blockaden als `skipped` im Mail-Center landen. Das eigene 05–23-Fenster entfällt.
-- **Keine Änderung an Limit-Werten selbst** — nur die Einhaltung wird korrigiert.
-- Danach Typecheck/Build und eine Kontrolle, dass jede Versandfunktion entweder `guardSend` nutzt oder die Werte aus `_shared/limits.ts` importiert.
+**D. Rechtsseiten im Theme-Design**
+`buildLegalPage()` erhält: Kopfzeile mit Logo (falls hochgeladen) bzw. Firmenname und Primärfarbe, dezente Typo-Skala, ruhiges Zwei-Spalten-Layout auf Desktop, echter Footer mit Kontakt + Impressum/Datenschutz. Primär-/Sekundärfarbe werden aus dem Branding als CSS-Variablen gesetzt, das `!important`-Überschreiben des Theme-CSS entfällt. Ziel: erkennbar dieselbe Marke wie die Landing Page, aber nüchtern und textlastig.
 
-## Technische Details
+**E. Musterdaten entschärfen**
+Alle Platzhalter-Adressen/Telefonnummern/E-Mails in den `meta.json`-Defaults auf leere Strings umstellen bzw. als `placeholder` statt `default` behandeln, sodass sie im Editor als Hinweis sichtbar, aber nicht in die generierte Seite übernommen werden. Zusätzlich im Generator eine Warnung, wenn Firmenname, Straße, PLZ/Ort oder E-Mail fehlen, bevor eine Seite veröffentlicht wird.
 
-- Betroffene Dateien: `supabase/functions/send-reminders/index.ts`, `supabase/functions/process-invite-resend-queue/index.ts`.
-- Keine Migration, kein Schema-Eingriff, keine Änderung am Mail-Center-Frontend oder an `src/lib/email-stats.ts` nötig.
-- Nach dem Deploy müssen `send-reminders` und `process-invite-resend-queue` neu deployt werden, damit die Änderungen greifen.
+**F. Footer versachlichen**
+Die Badges „SSL-verschlüsselt" / „DSGVO-konform" aus `injectTrustFooter` entfernen (bzw. durch eine schlichte Textzeile ersetzen). Anbieterkennzeichnung in lesbarer Größe statt 90 % Opazität, Links ohne Unterstreichungs-Hack.
+
+**G. Verifikation**
+Für 4 repräsentative Themes (Midnight Premium, Editorial Premium, Tester-Lab, TTS-Consultant) ZIP-Ausgabe erzeugen, `impressum.html`/`datenschutz.html` im Browser rendern und per Screenshot prüfen; zusätzlich Kontrolle, dass kein Theme noch „Musterstraße"/„example.com" ausliefert.
+
+### Technische Hinweise
+- Der Landing-Server ist eine eigene Node-/Bun-App (`landing-server/server.js` ist die produktiv laufende Datei, `server.ts` die Quelle) — nach dem Deploy muss diese Datei mit ausgerollt werden, sonst bleiben Live-Seiten auf den alten Texten.
+- Bestehende, bereits in der DB gespeicherte Landings sind nicht betroffen, weil Impressum/Datenschutz zur Laufzeit aus `branding` gerendert werden — die Verbesserung greift sofort nach dem Deploy.
+- Kein Eingriff in Formular-, Funnel- oder E-Mail-Logik.
+
+### Rechtlicher Hinweis
+Die Texte sind sorgfältige Standardformulierungen, ersetzen aber keine Rechtsberatung. Insbesondere Aufsichtsbehörde/AÜG-Erlaubnis muss pro Mandant korrekt gepflegt werden.

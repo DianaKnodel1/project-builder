@@ -68,7 +68,7 @@
     { "key": "stat_4_body", "label": "Stat 4 Beschreibung", "type": "longtext", "default": "Die Zufriedenheit unserer Kundinnen und Kunden ist unser höchstes Gut." },
 
     { "key": "footer_tagline", "label": "Footer Tagline", "type": "longtext", "default": "Ihr Partner für Digitalisierung, IT-Security und Datenanalyse." },
-    { "key": "footer_address", "label": "Footer Adresse", "type": "longtext", "default": "Musterstraße 1\n12345 Musterstadt\nDeutschland" },
+    { "key": "footer_address", "label": "Footer Adresse", "type": "longtext", "default": "" },
     { "key": "footer_email", "label": "Footer E-Mail", "type": "text", "default": "info@tts-beratung.de" },
     { "key": "footer_phone", "label": "Footer Telefon", "type": "text", "default": "+49 (0) 123 456 789" },
     { "key": "impressum_url", "label": "Impressum-Link", "type": "text", "default": "impressum.html" },

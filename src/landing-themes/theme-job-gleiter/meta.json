@@ -69,7 +69,7 @@
     { "key": "form_title",      "label": "Formular Titel",    "type": "text",     "default": "Jetzt Bewerben" },
 
     { "key": "contact_email",   "label": "Footer E-Mail",     "type": "text",     "default": "kontakt@digital-arbeiten.de" },
-    { "key": "contact_phone",   "label": "Footer Telefon",    "type": "text",     "default": "+49 30 12345678" },
+    { "key": "contact_phone",   "label": "Footer Telefon",    "type": "text",     "default": "" },
     { "key": "impressum_url",   "label": "Impressum-URL",     "type": "text",     "default": "impressum.html" },
     { "key": "datenschutz_url", "label": "Datenschutz-URL",   "type": "text",     "default": "datenschutz.html" }
   ]

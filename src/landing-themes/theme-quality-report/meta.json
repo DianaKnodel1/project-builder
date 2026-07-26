@@ -44,7 +44,7 @@
     { "key": "final_cta", "label": "Final CTA Button", "type": "text", "default": "Jetzt bewerben" },
     { "key": "logo_text", "label": "Logo Text", "type": "text", "default": "Quality Report" },
     { "key": "firmenname", "label": "Firmenname", "type": "text", "default": "Quality Report" },
-    { "key": "contact_email", "label": "E-Mail", "type": "text", "default": "kontakt@example.de" },
+    { "key": "contact_email", "label": "E-Mail", "type": "text", "default": "" },
     { "key": "contact_phone", "label": "Telefon", "type": "text", "default": "" },
     { "key": "impressum_url", "label": "Impressum URL", "type": "text", "default": "#" },
     { "key": "datenschutz_url", "label": "Datenschutz URL", "type": "text", "default": "#" },

@@ -5,7 +5,7 @@
   "slots": [
     { "key": "seo_title", "label": "SEO Titel", "type": "text", "default": "Qualität sichtbar machen — Premium Testing Platform" },
     { "key": "seo_description", "label": "SEO Beschreibung", "type": "longtext", "default": "Professionelle Qualitätssicherung für Websites, Apps und digitale Produkte — durchgeführt von echten Testern und unterstützt durch moderne Analyseprozesse." },
-    { "key": "landing_domain", "label": "Domain (ohne https://)", "type": "text", "default": "example.com" },
+    { "key": "landing_domain", "label": "Domain (ohne https://)", "type": "text", "default": "" },
     { "key": "accent_color", "label": "Akzentfarbe (Hex — Cyan #22d3ee)", "type": "text", "default": "#22d3ee" },
 
     { "key": "brand_name", "label": "Marke / Firmenname", "type": "text", "default": "NEBULA" },
@@ -24,7 +24,7 @@
     { "key": "cta_secondary", "label": "Final CTA — Button sekundär", "type": "text", "default": "Kostenlos registrieren" },
 
     { "key": "footer_company", "label": "Footer — Firmenname", "type": "text", "default": "Nebula Quality GmbH" },
-    { "key": "footer_email", "label": "Footer — E-Mail", "type": "text", "default": "hello@example.com" },
+    { "key": "footer_email", "label": "Footer — E-Mail", "type": "text", "default": "" },
     { "key": "footer_phone", "label": "Footer — Telefon", "type": "text", "default": "+49 30 1234 5678" }
   ]
 }

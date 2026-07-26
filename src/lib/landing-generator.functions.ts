@@ -4,6 +4,8 @@ import JSZip from "jszip";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getTheme } from "./landing-themes";
 import { THEME_ASSETS } from "./theme-assets.generated";
+import { buildLegalPage, renderImpressum, renderDatenschutz, isPlaceholderValue } from "./legal-content";
+
 
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Ungültige Hex-Farbe");
 
@@ -102,7 +104,7 @@ function applyPlaceholders(
   if (branding.ust_id) legalLines.push(`USt-IdNr.: ${esc(branding.ust_id)}`);
   else if (branding.steuernummer) legalLines.push(`Steuernummer: ${esc(branding.steuernummer)}`);
   const legalBlock = legalLines.length
-    ? `<div class="lv-legal-block" style="font-size:14px;line-height:1.65;color:inherit;opacity:.9;">${legalLines.join("<br/>")}</div>`
+    ? `<div class="lv-legal-block" style="font-size:14.5px;line-height:1.75;color:inherit;">${legalLines.join("<br/>")}</div>`
     : "";
   const legalInlineParts = [
     branding.firmenname,
@@ -125,12 +127,23 @@ function applyPlaceholders(
     contact_address: addrParts,
     contact_email: (b.email as string) || "",
     contact_phone: (b.telefon as string) || "",
+    footer_address: addrParts,
+    footer_email: (b.email as string) || "",
+    footer_phone: (b.telefon as string) || "",
     sitz_stadt: (b.stadt as string) || "",
     legal_block: legalBlock,
     legal_inline: legalInlineParts,
     contact_block: contactBlock,
   };
-  const merged: Record<string, unknown> = { ...aliases, ...b, ...slotValues };
+  // Muster-/Demo-Werte aus Theme-Defaults verwerfen, damit keine Fantasie-Adressen
+  // auf einer echten Landing landen — die echten Firmendaten greifen dann.
+  const cleanSlots: Record<string, string> = {};
+  for (const [key, value] of Object.entries(slotValues)) {
+    if (key in aliases && isPlaceholderValue(value)) continue;
+    cleanSlots[key] = value;
+  }
+  const merged: Record<string, unknown> = { ...aliases, ...b, ...cleanSlots };
+
   let out = src;
   // Mehrere Passes: Slot-Werte können selbst {{branding}}-Tokens enthalten.
   for (let i = 0; i < 3; i++) {
@@ -222,25 +235,19 @@ function injectTrustFooter(html: string, b: z.infer<typeof BrandingSchema>): str
     </div>
     <div>
       <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px;">Anbieterkennzeichnung</div>
-      <div style="font-size:13.5px;line-height:1.75;color:#cbd5e1;">${legalItems.join("<br/>")}</div>
+      <div style="font-size:14.5px;line-height:1.8;color:#e2e8f0;">${legalItems.join("<br/>")}</div>
     </div>
     <div>
       <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px;">Rechtliches</div>
-      <ul style="list-style:none;padding:0;margin:0;font-size:14px;line-height:2;">
-        <li><a href="impressum.html" style="color:#e2e8f0;text-decoration:none;border-bottom:1px solid rgba(226,232,240,.3);">Impressum</a></li>
-        <li><a href="datenschutz.html" style="color:#e2e8f0;text-decoration:none;border-bottom:1px solid rgba(226,232,240,.3);">Datenschutzerklärung</a></li>
+      <ul style="list-style:none;padding:0;margin:0;font-size:14.5px;line-height:2;">
+        <li><a href="impressum.html" style="color:#e2e8f0;text-decoration:none;">Impressum</a></li>
+        <li><a href="datenschutz.html" style="color:#e2e8f0;text-decoration:none;">Datenschutzerklärung</a></li>
       </ul>
-      <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;">
-        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(34,197,94,.15);color:#86efac;border-radius:6px;font-size:12px;font-weight:600;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          SSL-verschlüsselt
-        </span>
-        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,.15);color:#93c5fd;border-radius:6px;font-size:12px;font-weight:600;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          DSGVO-konform
-        </span>
+      <div style="margin-top:18px;font-size:13px;line-height:1.7;color:#94a3b8;">
+        Die Übertragung Ihrer Bewerbungsdaten erfolgt TLS-verschlüsselt. Die Verarbeitung richtet sich nach unserer Datenschutzerklärung.
       </div>
     </div>
+
   </div>
   <div style="max-width:1180px;margin:32px auto 0;padding-top:20px;border-top:1px solid rgba(226,232,240,.1);font-size:12.5px;color:#94a3b8;text-align:center;">
     © ${year} ${esc(b.firmenname)}. Alle Rechte vorbehalten.
@@ -575,102 +582,9 @@ function parseDataUrl(dataUrl: string): { mime: string; bytes: Uint8Array } | nu
   return { mime, bytes };
 }
 
-function escapeHtml(s: string): string {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
+// Impressum/Datenschutz/Seitenrahmen kommen zentral aus src/lib/legal-content.ts
+// (gespiegelt nach landing-server/legal-content.js für den Live-Renderer).
 
-function renderImpressum(b: z.infer<typeof BrandingSchema>): string {
-  const addr = [b.strasse, [b.plz, b.stadt].filter(Boolean).join(" ")].filter(Boolean).map(escapeHtml).join("<br/>");
-  const rows: string[] = [];
-  rows.push(`<p><strong>${escapeHtml(b.firmenname)}</strong><br/>${addr}</p>`);
-  if (b.geschaeftsfuehrer) rows.push(`<p><strong>Vertreten durch:</strong><br/>${escapeHtml(b.geschaeftsfuehrer)}</p>`);
-  const contact: string[] = [];
-  if (b.telefon) contact.push(`Telefon: <a href="tel:${escapeHtml(b.telefon)}">${escapeHtml(b.telefon)}</a>`);
-  if (b.email) contact.push(`E-Mail: <a href="mailto:${escapeHtml(b.email)}">${escapeHtml(b.email)}</a>`);
-  if (contact.length) rows.push(`<h3>Kontakt</h3><p>${contact.join("<br/>")}</p>`);
-  const reg: string[] = [];
-  if (b.registergericht) reg.push(`Registergericht: ${escapeHtml(b.registergericht)}`);
-  if (b.hrb) reg.push(`Registernummer: ${escapeHtml(b.hrb)}`);
-  if (reg.length) rows.push(`<h3>Registereintrag</h3><p>${reg.join("<br/>")}</p>`);
-  const tax: string[] = [];
-  if (b.ust_id) tax.push(`USt-IdNr.: ${escapeHtml(b.ust_id)}`);
-  if (b.steuernummer) tax.push(`Steuernummer: ${escapeHtml(b.steuernummer)}`);
-  if (tax.length) rows.push(`<h3>Umsatzsteuer</h3><p>${tax.join("<br/>")}</p>`);
-  if (b.impressum) rows.push(`<div>${b.impressum}</div>`);
-  rows.push(`<p style="margin-top:24px;font-size:13px;opacity:.7;">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV: ${escapeHtml(b.geschaeftsfuehrer || b.firmenname)}, ${addr.replace(/<br\/>/g, ", ")}</p>`);
-  return rows.join("\n");
-}
-
-function renderDatenschutz(b: z.infer<typeof BrandingSchema>): string {
-  const name = escapeHtml(b.firmenname);
-  const email = escapeHtml(b.email);
-  return `
-    <h3>1. Verantwortlicher</h3>
-    <p>Verantwortlich für die Datenverarbeitung auf dieser Website ist:<br/>
-    ${name}<br/>${escapeHtml(b.strasse)}<br/>${escapeHtml([b.plz, b.stadt].filter(Boolean).join(" "))}<br/>
-    E-Mail: <a href="mailto:${email}">${email}</a></p>
-
-    <h3>2. Erhebung und Verarbeitung personenbezogener Daten</h3>
-    <p>Wir verarbeiten personenbezogene Daten, die Sie uns über das Bewerbungsformular zur Verfügung stellen (z.&nbsp;B. Name, Anschrift, Geburtsdatum, Kontaktdaten), zur Durchführung des Bewerbungsverfahrens gemäß Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;b DSGVO sowie § 26 BDSG.</p>
-
-    <h3>3. Speicherdauer</h3>
-    <p>Ihre Bewerbungsdaten werden bis zu 6 Monate nach Abschluss des Verfahrens gespeichert und anschließend gelöscht, sofern keine längere Aufbewahrungspflicht besteht oder Sie in eine längere Speicherung eingewilligt haben.</p>
-
-    <h3>4. Empfänger</h3>
-    <p>Eine Weitergabe an Dritte erfolgt nur, wenn dies zur Durchführung des Bewerbungsverfahrens erforderlich ist (z.&nbsp;B. an Partnerunternehmen im Rahmen einer Vermittlung) oder Sie eingewilligt haben.</p>
-
-    <h3>5. Ihre Rechte</h3>
-    <p>Sie haben das Recht auf Auskunft (Art.&nbsp;15 DSGVO), Berichtigung (Art.&nbsp;16 DSGVO), Löschung (Art.&nbsp;17 DSGVO), Einschränkung der Verarbeitung (Art.&nbsp;18 DSGVO), Datenübertragbarkeit (Art.&nbsp;20 DSGVO) sowie das Recht auf Widerspruch (Art.&nbsp;21 DSGVO). Anfragen richten Sie bitte an <a href="mailto:${email}">${email}</a>.</p>
-
-    <h3>6. Beschwerderecht</h3>
-    <p>Sie haben das Recht, sich bei einer Datenschutzaufsichtsbehörde über die Verarbeitung Ihrer personenbezogenen Daten zu beschweren.</p>
-
-    <h3>7. SSL-Verschlüsselung</h3>
-    <p>Diese Website nutzt aus Sicherheitsgründen eine SSL-/TLS-Verschlüsselung zur Übertragung vertraulicher Inhalte.</p>
-  `;
-}
-
-function buildLegalPage(title: string, body: string, b: z.infer<typeof BrandingSchema>): string {
-  const t = escapeHtml(title);
-  const firm = escapeHtml(b.firmenname);
-  return `<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>${t} – ${firm}</title>
-<meta name="robots" content="noindex,follow" />
-<link rel="stylesheet" href="style.css" />
-<style>
-  html, body { background:#ffffff !important; color:#1a1a1a !important; }
-  body::before, body::after { display:none !important; }
-  .legal-page { max-width: 820px; margin: 0 auto; padding: 64px 24px 96px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color:#1a1a1a; line-height:1.7; background:#ffffff; }
-  .legal-page h1 { font-size: 36px; margin: 0 0 8px; color:#0f172a; }
-  .legal-page h3 { font-size: 18px; margin: 28px 0 8px; color:#0f172a; }
-  .legal-page p, .legal-page div, .legal-page li { color:#1a1a1a; }
-  .legal-page p { margin: 0 0 12px; }
-  .legal-page strong { color:#0f172a; }
-  .legal-page a { color: #2563eb; }
-  .legal-back { display:inline-block; margin-bottom: 24px; color:#64748b; text-decoration:none; font-size:14px; }
-  .legal-back:hover { color:#1a1a1a; }
-  .legal-footer { max-width:820px; margin: 0 auto; padding: 24px; border-top:1px solid #e5e7eb; font-size:13px; color:#64748b; text-align:center; background:#ffffff; }
-  .legal-footer a { color:#64748b; }
-</style>
-</head>
-<body>
-<main class="legal-page">
-  <a href="index.html" class="legal-back">← Zurück zur Startseite</a>
-  <h1>${t}</h1>
-  ${body}
-</main>
-<footer class="legal-footer">
-  © ${new Date().getFullYear()} ${firm} ·
-  <a href="impressum.html">Impressum</a> ·
-  <a href="datenschutz.html">Datenschutz</a>
-</footer>
-</body>
-</html>`;
-}
 
 export const generateLandingZip = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -735,8 +649,15 @@ export const generateLandingZip = createServerFn({ method: "POST" })
     const css = applyPlaceholders(theme.css, cleanedBranding, slots);
     const js = applyPlaceholders(theme.js, cleanedBranding, slots);
 
-    const impressumHtml = buildLegalPage("Impressum", renderImpressum(cleanedBranding), cleanedBranding);
-    const datenschutzHtml = buildLegalPage("Datenschutz", renderDatenschutz(cleanedBranding), cleanedBranding);
+    const legalOpts = {
+      homeHref: "index.html",
+      impressumHref: "impressum.html",
+      datenschutzHref: "datenschutz.html",
+      logoUrl: data.logoDataUrl ? "assets/logo.png" : undefined,
+    };
+    const impressumHtml = buildLegalPage("Impressum", renderImpressum(cleanedBranding), cleanedBranding, legalOpts);
+    const datenschutzHtml = buildLegalPage("Datenschutz", renderDatenschutz(cleanedBranding), cleanedBranding, legalOpts);
+
 
     const zip = new JSZip();
     zip.file("index.html", html);

@@ -272,6 +272,21 @@ function LandingGeneratorPage() {
   const currentTheme = THEME_LIST.find((t) => t.id === themeId);
   const currentSlots = currentTheme?.slots ?? [];
   const slotsForOutput = normalizeSlotsForTheme(themeId, slotValues, withSeoDefaults(branding));
+
+  // Pflichtangaben nach § 5 DDG — fehlen sie, ist das Impressum unvollständig.
+  const impressumMissing = (
+    [
+      ["Firmenname", branding.firmenname],
+      ["Straße & Hausnummer", branding.strasse],
+      ["PLZ", branding.plz],
+      ["Stadt", branding.stadt],
+      ["Kontakt-E-Mail", branding.email],
+      ["Vertretungsberechtigte(r) / Geschäftsführer", branding.geschaeftsfuehrer],
+    ] as const
+  )
+    .filter(([, value]) => !String(value ?? "").trim())
+    .map(([label]) => label);
+
   const selectTheme = (id: string) => {
     setThemeId(id);
     setSlotValues(normalizeSlotsForTheme(id, {}, withSeoDefaults(branding)));
@@ -1457,6 +1472,18 @@ document.addEventListener('submit', function(e){
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {impressumMissing.length > 0 && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                  <p className="font-medium text-amber-700 dark:text-amber-400">
+                    Impressum unvollständig — rechtlich erforderliche Angaben fehlen:
+                  </p>
+                  <p className="mt-1 text-muted-foreground">{impressumMissing.join(" · ")}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Bitte in Schritt „Firmendaten" ergänzen. Fehlende Felder werden im Impressum weggelassen.
+                  </p>
+                </div>
+              )}
+
               <Field label="Interner Slug (a-z, 0-9, -) — leer = aus Domain generieren">
                 <Input
                   value={slug}

@@ -5,7 +5,7 @@
   "slots": [
     { "key": "seo_title", "label": "SEO Titel (Browser-Tab)", "type": "text", "default": "Digitale Qualität entscheidet — Professionelle Tests für Websites, Apps & Software" },
     { "key": "seo_description", "label": "SEO Beschreibung", "type": "longtext", "default": "Professionelle Qualitätssicherung für Websites, Apps und digitale Produkte. Über 25.000 durchgeführte Tests, 1.500+ aktive Tester, 40+ Geräteklassen." },
-    { "key": "landing_domain", "label": "Domain (ohne https://)", "type": "text", "default": "example.com" },
+    { "key": "landing_domain", "label": "Domain (ohne https://)", "type": "text", "default": "" },
     { "key": "accent_color", "label": "Akzentfarbe (Hex — Royal Blue oder Petrol)", "type": "text", "default": "#1e40ff" },
 
     { "key": "brand_name", "label": "Marke / Firmenname", "type": "text", "default": "QUALITAS" },

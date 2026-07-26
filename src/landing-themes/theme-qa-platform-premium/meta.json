@@ -160,7 +160,7 @@
     { "key": "cta_secondary", "label": "Abschluss Button sekundär", "type": "text", "default": "Angebot anfragen" },
 
     { "key": "footer_tagline", "label": "Footer Tagline", "type": "longtext", "default": "Die Premium-Plattform für digitale Qualitätssicherung." },
-    { "key": "landing_domain", "label": "Landing Domain", "type": "text", "default": "example.com" },
+    { "key": "landing_domain", "label": "Landing Domain", "type": "text", "default": "" },
     { "key": "seo_image", "label": "OG Bild URL", "type": "image", "default": "" },
     { "key": "favicon_image", "label": "Favicon URL", "type": "image", "default": "" }
   ]

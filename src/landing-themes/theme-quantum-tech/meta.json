@@ -5,7 +5,7 @@
   "slots": [
     { "key": "seo_title", "label": "SEO Titel", "type": "text", "default": "Qualität sichtbar machen — Premium Testing für Web, App & Software" },
     { "key": "seo_description", "label": "SEO Beschreibung", "type": "longtext", "default": "Professionelle Qualitätssicherung für Websites, Apps und digitale Produkte — durchgeführt von echten Testern und unterstützt durch moderne Analyseprozesse." },
-    { "key": "landing_domain", "label": "Domain (ohne https://)", "type": "text", "default": "example.com" },
+    { "key": "landing_domain", "label": "Domain (ohne https://)", "type": "text", "default": "" },
     { "key": "accent_color", "label": "Akzentfarbe (Hex — Cyan #22d3ee, Violett #a78bfa)", "type": "text", "default": "#22d3ee" },
 
     { "key": "brand_name", "label": "Marke / Firmenname", "type": "text", "default": "QUANTUM" },
@@ -139,10 +139,10 @@
     { "key": "final_cta_2", "label": "Final CTA — Button 2", "type": "text", "default": "Kostenlos registrieren" },
 
     { "key": "footer_note", "label": "Footer — Slogan", "type": "longtext", "default": "Digital Quality Platform — made with precision." },
-    { "key": "footer_email", "label": "Footer — E-Mail", "type": "text", "default": "hallo@example.com" },
+    { "key": "footer_email", "label": "Footer — E-Mail", "type": "text", "default": "" },
     { "key": "footer_phone", "label": "Footer — Telefon", "type": "text", "default": "+49 30 123 456 78" },
     { "key": "footer_address", "label": "Footer — Adresse", "type": "text", "default": "Berlin · Hamburg · München" },
     { "key": "telefon", "label": "Kontakt Telefon", "type": "text", "default": "+49 30 123 456 78" },
-    { "key": "email", "label": "Kontakt E-Mail", "type": "text", "default": "hallo@example.com" }
+    { "key": "email", "label": "Kontakt E-Mail", "type": "text", "default": "" }
   ]
 }
