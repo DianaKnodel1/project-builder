@@ -10,6 +10,7 @@ let out = src
   .replace(/export type [A-Za-z]+ = \{[\s\S]*?\n\};\n\n?/g, "")
   // Parameter-/Rückgabe-Annotationen
   .replace(/\(s: unknown\)/g, "(s)")
+  .replace(/\(b: LegalBranding\): string\[\]/g, "(b)")
   .replace(/\(b: LegalBranding = \{\}\)/g, "(b = {})")
   .replace(/b: LegalBranding = \{\},/g, "b = {},")
   .replace(/opts: LegalPageOptions = \{\},/g, "opts = {},")
