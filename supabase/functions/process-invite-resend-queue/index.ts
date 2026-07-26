@@ -12,7 +12,8 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { MAX_PER_24H_PER_TENANT } from "../_shared/limits.ts";
+import { MAX_PER_RUN_PER_TENANT } from "../_shared/limits.ts";
+import { berlinHour, guardSend, isInsideSendWindow } from "../_shared/send-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,23 +22,11 @@ const corsHeaders = {
 };
 
 // Ziel: gleichmäßig verteilte Sends statt Burst → Spam-Schutz.
-// 40 Mails/Stunde × 18 aktive Stunden (05–23 Berlin) = 720/Tag Kapazität.
-// 4 Runs/h × 10 = 40/h. Sobald Queue leer ist, läuft der Cron leer durch.
-const MAX_PER_RUN = 10;
-// Quiet-Hours (Europe/Berlin): aktiv 05:00–23:00
-const QUIET_START = 5;
-const QUIET_END = 23;
+// Pro-Lauf-Cap zentral aus _shared/limits.ts; Stunden-/Tageskontingent und
+// Sendefenster prüft der gemeinsame send-guard (identisch zu allen anderen
+// Versandfunktionen). Sobald die Queue leer ist, läuft der Cron leer durch.
+const MAX_PER_RUN = MAX_PER_RUN_PER_TENANT;
 
-function berlinHour(): number {
-  const h = new Intl.DateTimeFormat("de-DE", {
-    timeZone: "Europe/Berlin", hour: "2-digit", hour12: false,
-  }).format(new Date());
-  return parseInt(h, 10);
-}
-function isQuietHours(): boolean {
-  const h = berlinHour();
-  return h < QUIET_START || h >= QUIET_END;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
