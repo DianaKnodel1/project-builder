@@ -1,39 +1,45 @@
-## Befund: Portal-Designs
+## Teil 1 — Was sind die zentralen Limits?
 
-Ich habe die drei Designs unter `/portal-designs` in echten Screenshots geprüft (clean, office, atmosphere). Grundstruktur ist gut und wirkt seriös, aber vier Punkte sehen noch nicht professionell aus:
+Alle Zahlen stehen an genau einer Stelle: `supabase/functions/_shared/limits.ts`. Ändert man sie dort, gilt das für alle Versandfunktionen.
 
-1. **Schrift-Mix**: Überschrift und Labels sind Sans, die Beschreibungstexte („Melde dich mit deinen Zugangsdaten an.“, „oder“, „Passwort vergessen…“, Impressum/Datenschutz) rendern in einer Serif-Schrift. Das wirkt wie ein Fehler, nicht wie Design.
-2. **Trenner „oder“**: Das Label hat einen weißen Kasten (`bg-card`), der auf den halbtransparenten Bildkarten als sichtbares weißes Rechteck über der Linie klebt. Bei „Brand Atmosphere“ sind die Trennlinien zusätzlich asymmetrisch (links kurz, rechts lang).
-3. **Office Focus**: Das Foto ist praktisch nicht abgedunkelt; die weiße Fußzeile (Impressum/Datenschutz) steht auf hellem Teppich und ist kaum lesbar. Auch die Wortmarke oben links hat zu wenig Kontrast.
-4. **Brand Atmosphere**: Der Weichzeichner ist so stark, dass das Bild als Grau-Grün-Fläche endet — Markenwirkung geht verloren; die Karte wirkt dadurch gräulich statt hochwertig.
+| Wert | Aktuell | Bedeutung |
+|---|---|---|
+| Sendefenster | 06:00–22:00 Berlin | Reminder/Kampagnen senden nur in diesem Fenster. Transaktionale Mails (Bestätigung, Passwort-Reset, Terminbestätigung, Einladung) ignorieren das Fenster bewusst. |
+| Pro Stunde / Mandant | 150 | Harte Grenze des SMTP-Vertrags. |
+| Pro 12 Stunden / Mandant | 1.800 | Zwischen-Puffer (12 × 150). |
+| Pro Tag / Mandant | 2.400 | 16 Sendestunden × 150. |
+| Bewerber-Reminder pro Cron-Lauf | 10 | Cron alle 5 Min → max. 120/h, bleibt unter 150. |
+| Onboarding-Reminder pro Lauf, Mandant und Typ | 50 | Verhindert Burst-Versand. |
 
-### Umsetzung Design
-- Typografie in `src/lib/portal-themes.ts` vereinheitlichen (alle Text-Tokens explizit auf die UI-Schrift, keine Serif-Vererbung), Größen/Zeilenhöhen pro Theme abgestimmt.
-- Trenner neu: Label ohne Kasten, Linien mit `flex-1` gleich lang, auf Bild-Themes gedämpfter Kontrast.
-- Office Focus: dunkler Verlaufs-Overlay (unten stärker) statt flacher Fläche, Fußzeile und Wortmarke mit lesbarem Kontrast bzw. leichtem Schatten.
-- Brand Atmosphere: Blur deutlich reduzieren, dezenter Marken-Verlauf, Karte klar weiß/neutral statt grau.
-- Karten-Feinschliff: einheitliche Innenabstände, Fokus-Ringe der Felder, Button-Höhen, Logo-Zeile oben links konsistent.
-- Kontrolle mit Screenshots auf Desktop **und** Mobil — nicht nur auf `/portal-designs`, sondern auch auf den echten Seiten `/login`, `/register`, `/forgot-password`.
+## Teil 2 — Logging und Statistik, einfach erklärt
 
-## Befund: E-Mail-System
+**Jede Entscheidung wird protokolliert.** Es gibt eine Tabelle (`email_send_log`), in die jede Mail einen Eintrag schreibt — egal wie es ausgeht:
+- `sent` = raus
+- `failed` = Versand fehlgeschlagen
+- `pending` = unterwegs / Wiederholung offen
+- `skipped` = absichtlich nicht gesendet (z. B. Limit erreicht, Mandant pausiert, außerhalb Sendefenster) — mit Grund und Zählerstand
 
-Geprüft: alle Versand-Funktionen, das zentrale Log `email_send_log`, die Limits und das E-Mail-Center.
+Daraus baut das Mail-Center: Gesamtvolumen, Balken pro Tag, Aufteilung pro Mandant, CSV-Export.
 
-**Was passt:** Zentrale Limits (150/h, 2.400/Tag, Fenster 6–22 Uhr) liegen an einer Stelle; Bewerber-Reminder und Onboarding-Reminder respektieren sie und schreiben `sent`/`failed`/`skipped` inkl. Grund ins Log. Erneut-Senden inkl. `superseded`-Markierung funktioniert.
+**Warum „dedupliziert"?** Eine Mail kann mehrere Zeilen erzeugen: erst `pending`, dann `sent`. Ohne Bereinigung würde dieselbe Mail zweimal gezählt. Die Statistik gruppiert deshalb nach *Mandant + Vorlage + Empfänger + Tag* und behält nur den „endgültigsten" Zustand: `sent`/`failed`/`bounced` gewinnen immer gegen `pending`, bei Gleichstand der neuere Eintrag. Ergebnis: 1 Versand = 1 Zeile in der Statistik, und die Erfolgsquote wird nur aus abgeschlossenen Versänden gerechnet (offene Retries drücken sie nicht künstlich).
 
-**Lücken, die ich beheben will:**
-1. **Limits gelten nur für Reminder.** Einladung, Terminbestätigung, Signup-Bestätigung (inkl. erneutes Senden), Terminerinnerung, Chat-Reminder und Passwort-Reset prüfen weder das Stundenkontingent noch das Sendefenster. Bei Lastspitzen laufen wir wieder in die SMTP-Sperre (554 5.7.1) — genau der Fehler aus den Tests.
-2. **Logging nicht vollständig.** `send-password-reset` schreibt nur Erfolge, kein Fehlschlag; `send-signup-confirmation` schreibt zusätzlich in eine Alt-Tabelle `email_logs` (Altlast, doppelte Wahrheit). Ergebnis: die Zahlen im Center können zu niedrig sein.
-3. **„Wie viele Mails gingen raus?“ ist nicht exakt ablesbar.** Das Center lädt max. 5.000 Zeilen und zeigt nur 100 davon, ohne echte Gesamtzahl, ohne Zeitverlauf, ohne Aufschlüsselung pro Mandant und ohne Export.
+## Teil 3 — Prüfung: drei echte Lücken gefunden
 
-### Umsetzung E-Mail
-- Gemeinsamer Versand-Guard neben `_shared/limits.ts`: zählt Stunde/Tag pro Tenant aus `email_send_log` und wird von **allen** Funktionen genutzt. Transaktionale Mails (Bestätigung, Reset, Terminbestätigung) respektieren das Stundenkontingent, aber nicht das 6–22-Uhr-Fenster; Reminder respektieren beides. Jede Blockade landet als `skipped` mit Grund im Log.
-- Gemeinsamer Log-Helfer: jede Funktion protokolliert **immer** — `sent`, `failed` (mit Fehlertext), `skipped` (mit Grund) — inkl. Empfänger, Template, Absender, Mandant. Alt-Schreibpfad `email_logs` entfernen, damit es nur eine Quelle gibt.
-- E-Mail-Center erweitern: exakte Gesamtzahlen per Zähl-Abfrage (nicht aus geladenen Zeilen), Tagesverlauf der Sendungen, Aufschlüsselung pro Mandant und Template, „mehr laden“ statt harter 100er-Grenze, CSV-Export für den gewählten Zeitraum.
-- Abdeckungs-Check: prüfen, welche Auth-Mails ggf. noch direkt über den Auth-Dienst laufen und daher nicht im Log erscheinen; diese entweder über den eigenen Versand leiten oder sichtbar als „extern versendet“ kennzeichnen.
-- Abschließend die 14-stufige Testkette einmal durchlaufen und im Center gegenprüfen, dass jeder Schritt genau eine Zeile mit korrektem Status erzeugt.
+Die Prüfung hat drei Stellen ergeben, an denen der Anspruch „nichts reißt 150/h" heute noch nicht sauber gehalten wird:
+
+1. **`send-reminders` hat keine Stunden-Grenze.** Es prüft nur 50 pro Lauf/Mandant/Typ und die Tagesgrenze. Bei 5 Reminder-Typen sind das bis zu 250 Mails in einem einzigen Lauf — über 150/h, obwohl die Tagesgrenze noch nicht erreicht ist.
+2. **Falsch benannte Kappe in `send-reminders`.** Die Funktion `tenant12hCapReached` prüft gegen den 24h-Wert (2.400), nicht gegen 1.800. Wirkt harmlos, macht aber jede Fehlersuche irreführend, und die Meldung im Log heißt fälschlich `tenant_12h_cap_reached`.
+3. **`process-invite-resend-queue` zählt zu optimistisch.** Es zählt nur `sent`, während der zentrale Guard `sent`, `pending`, `bounced`, `complained` zählt. Dadurch kann diese Queue die Kontingente überschreiten. Zusätzlich prüft sie gar keine Stunden-Grenze und hat ein eigenes Quiet-Hours-Fenster (05–23) statt des zentralen 06–22.
+
+## Umsetzung
+
+- **`send-reminders`**: 1h-Zähler pro Mandant beim Lauf-Start aus `email_send_log` laden (gleiche Status-Liste wie der Guard) und vor jedem Send prüfen; Skip als `tenant_1h_cap` loggen. Die 12h-Prüfung auf den echten 12h-Wert korrigieren und den Log-Grund entsprechend benennen.
+- **`process-invite-resend-queue`**: die eigene Zähl-/Fenster-Logik durch `guardSend` aus `_shared/send-guard.ts` ersetzen (Kind `reminder`), sodass Stunden-, Tages- und Fenster-Regeln identisch gelten und Blockaden als `skipped` im Mail-Center landen. Das eigene 05–23-Fenster entfällt.
+- **Keine Änderung an Limit-Werten selbst** — nur die Einhaltung wird korrigiert.
+- Danach Typecheck/Build und eine Kontrolle, dass jede Versandfunktion entweder `guardSend` nutzt oder die Werte aus `_shared/limits.ts` importiert.
 
 ## Technische Details
-- Dateien Design: `src/lib/portal-themes.ts`, `src/components/portal/PortalAuthShell.tsx`, `src/routes/portal-designs.tsx`.
-- Dateien E-Mail: `supabase/functions/_shared/limits.ts` (+ neuer Guard/Log-Helfer), `send-invitation-email`, `send-booking-confirmation`, `send-signup-confirmation`, `resend-signup-confirmation`, `send-appointment-reminders`, `send-chat-reminder`, `send-password-reset`, `src/routes/admin.email-center.tsx`, `src/lib/email-stats.ts`.
-- Kein Schema-Umbau nötig; `email_send_log` bleibt die einzige Quelle. Änderungen an den Edge Functions müssen wie gewohnt auf Server 123 ausgerollt werden.
+
+- Betroffene Dateien: `supabase/functions/send-reminders/index.ts`, `supabase/functions/process-invite-resend-queue/index.ts`.
+- Keine Migration, kein Schema-Eingriff, keine Änderung am Mail-Center-Frontend oder an `src/lib/email-stats.ts` nötig.
+- Nach dem Deploy müssen `send-reminders` und `process-invite-resend-queue` neu deployt werden, damit die Änderungen greifen.
