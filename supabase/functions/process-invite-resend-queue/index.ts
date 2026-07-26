@@ -34,9 +34,11 @@ serve(async (req) => {
   const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
   const ignoreQuiet = body?.ignore_quiet_hours === true;
 
-  if (isQuietHours() && !ignoreQuiet) {
-    return json({ skipped: "quiet_hours", hour: berlinHour() }, 200);
+  // Zentrales Sendefenster (06–22 Berlin) aus _shared/limits.ts.
+  if (!isInsideSendWindow() && !ignoreQuiet) {
+    return json({ skipped: "outside_send_window", hour: berlinHour() }, 200);
   }
+
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
