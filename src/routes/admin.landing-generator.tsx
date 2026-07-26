@@ -272,6 +272,21 @@ function LandingGeneratorPage() {
   const currentTheme = THEME_LIST.find((t) => t.id === themeId);
   const currentSlots = currentTheme?.slots ?? [];
   const slotsForOutput = normalizeSlotsForTheme(themeId, slotValues, withSeoDefaults(branding));
+
+  // Pflichtangaben nach § 5 DDG — fehlen sie, ist das Impressum unvollständig.
+  const impressumMissing = (
+    [
+      ["Firmenname", branding.firmenname],
+      ["Straße & Hausnummer", branding.strasse],
+      ["PLZ", branding.plz],
+      ["Stadt", branding.stadt],
+      ["Kontakt-E-Mail", branding.email],
+      ["Vertretungsberechtigte(r) / Geschäftsführer", branding.geschaeftsfuehrer],
+    ] as const
+  )
+    .filter(([, value]) => !String(value ?? "").trim())
+    .map(([label]) => label);
+
   const selectTheme = (id: string) => {
     setThemeId(id);
     setSlotValues(normalizeSlotsForTheme(id, {}, withSeoDefaults(branding)));
