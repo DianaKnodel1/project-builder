@@ -96,6 +96,7 @@ function CancelPage() {
                 <Link
                   to="/termin/buchen/$token"
                   params={{ token: cancelledMagicToken || a.magic_token! }}
+                  search={{ rebook: true }}
                   className="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
                 >
                   <CalendarClock className="h-4 w-4" /> Neuen Termin buchen

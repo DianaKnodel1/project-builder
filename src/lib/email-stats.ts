@@ -38,6 +38,7 @@ export const EMAIL_TYPE_LABELS: Record<string, string> = {
   invitation: "Einladung",
   test_email: "Test",
   auth_emails: "Auth / Reset",
+  password_reset: "Passwort-Reset",
   "contact-confirmation": "Kontakt",
   auth_recovery: "Passwort-Reset",
   auth_signup: "Bestätigung",
