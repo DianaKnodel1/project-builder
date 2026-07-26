@@ -21,9 +21,12 @@ import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import {
   SEND_WINDOW_START_HOUR as WINDOW_START,
   SEND_WINDOW_END_HOUR as WINDOW_END,
+  MAX_PER_1H_PER_TENANT as LIMIT_1H,
+  MAX_PER_12H_PER_TENANT as LIMIT_12H,
   MAX_PER_24H_PER_TENANT as LIMIT_24H,
   MAX_SENDS_PER_RUN_PER_TENANT as LIMIT_RUN_TYPE,
 } from "../_shared/limits.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
