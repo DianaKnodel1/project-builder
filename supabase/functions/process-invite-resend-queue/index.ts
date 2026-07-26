@@ -164,7 +164,6 @@ serve(async (req) => {
         sent_at: new Date().toISOString(),
         attempts: (row.attempts ?? 0) + 1,
       }).eq("id", row.id);
-      tenantCount24h.set(row.tenant_id, (tenantCount24h.get(row.tenant_id) ?? 0) + 1);
       sent++;
     } catch (e: any) {
       const attempts = (row.attempts ?? 0) + 1;
