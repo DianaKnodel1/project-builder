@@ -156,6 +156,28 @@ bash scripts/deploy-backend.sh --dry-run   # zuerst: was würde passieren?
 bash scripts/deploy-backend.sh             # dann echt deployen
 ```
 
+### Migrations beim Frontend-Deploy (`deploy.sh`)
+
+`deploy.sh` auf PORTAL_HOST spielt Manual-Migrations nur ein, wenn
+`TARGET_DB_URL` gesetzt und die DB erreichbar ist. Steht im Log
+„keine Manual-Migrations, TARGET_DB_URL nicht gesetzt oder DB unreachable",
+wurden **keine** SQL-Dateien angewendet.
+
+Dauerhaft setzen (einmalig auf PORTAL_HOST):
+
+```
+echo 'TARGET_DB_URL=postgresql://postgres:<PASSWORT>@190.97.167.123:5432/postgres' >> /opt/apps/portal/.env
+```
+
+Oder Migrations gezielt nachziehen:
+
+```
+cd /opt/apps/portal
+TARGET_DB_URL='postgresql://postgres:<PASSWORT>@190.97.167.123:5432/postgres' bash scripts/migrate.sh
+```
+
+Empfohlen bleibt der Weg über `deploy-backend.sh` (docker exec, kein Pooler).
+
 ### Wenn etwas schiefgeht
 
 - Migration failed → State-File wird nicht aktualisiert; Fehler fixen und
@@ -166,6 +188,9 @@ bash scripts/deploy-backend.sh             # dann echt deployen
 - „Tenant or user not found" → das war der alte Pooler-Weg (Port 6543).
   `deploy-backend.sh` umgeht das, weil es direkt über `docker exec
   supabase-db psql` geht.
+- `bash: scripts/deploy-backend.sh: No such file or directory` → du bist nicht
+  im Repo-Verzeichnis. Erst `cd /opt/apps/portal`.
+
 
 ---
 
