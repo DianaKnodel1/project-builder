@@ -642,8 +642,15 @@ export const generateLandingZip = createServerFn({ method: "POST" })
     const css = applyPlaceholders(theme.css, cleanedBranding, slots);
     const js = applyPlaceholders(theme.js, cleanedBranding, slots);
 
-    const impressumHtml = buildLegalPage("Impressum", renderImpressum(cleanedBranding), cleanedBranding);
-    const datenschutzHtml = buildLegalPage("Datenschutz", renderDatenschutz(cleanedBranding), cleanedBranding);
+    const legalOpts = {
+      homeHref: "index.html",
+      impressumHref: "impressum.html",
+      datenschutzHref: "datenschutz.html",
+      logoUrl: data.logoDataUrl ? "assets/logo.png" : undefined,
+    };
+    const impressumHtml = buildLegalPage("Impressum", renderImpressum(cleanedBranding), cleanedBranding, legalOpts);
+    const datenschutzHtml = buildLegalPage("Datenschutz", renderDatenschutz(cleanedBranding), cleanedBranding, legalOpts);
+
 
     const zip = new JSZip();
     zip.file("index.html", html);
