@@ -183,15 +183,21 @@ else
   if [ -n "$BACKEND_HEALTH_URL" ]; then
     info "curl ${BACKEND_HEALTH_URL}"
     for _ in 1 2 3 4 5; do
-      if curl -fsS -o /dev/null -w "  HTTP %{http_code}\n" "$BACKEND_HEALTH_URL"; then
-        ok "Backend antwortet"
+      code="$(curl -s -o /dev/null -w '%{http_code}' \
+                ${BACKEND_ANON_KEY:+-H "apikey: ${BACKEND_ANON_KEY}"} \
+                "$BACKEND_HEALTH_URL" || echo 000)"
+      # 401 = Kong antwortet, nur ohne apikey → Backend ist erreichbar
+      if [ "$code" != "000" ] && [ "$code" -lt 500 ]; then
+        ok "Backend antwortet (HTTP $code)"
         break
       fi
+      warn "HTTP $code — retry"
       sleep 2
     done
   else
     warn "BACKEND_HEALTH_URL nicht gesetzt — HTTP-Check übersprungen"
   fi
+
 fi
 
 log "4/4  Fertig ✅"
