@@ -20,8 +20,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import { loadTenantForSend } from "../_shared/sender-resolver.ts";
+import { guardSend } from "../_shared/send-guard.ts";
 
-const FUNCTION_VERSION = "2026-07-25-generic-resend-v1";
+const FUNCTION_VERSION = "2026-07-26-generic-resend-guard-v2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -151,6 +152,24 @@ serve(async (req) => {
 
     const { tenant, reason } = await loadTenantForSend(admin, tenantId);
     if (!tenant) return json({ error: `Versand nicht möglich: ${reason}`, code: reason }, 422);
+
+    // Auch der manuelle Resend zählt gegen die SMTP-Kontingente des Tenants.
+    const allowance = await guardSend({
+      admin,
+      tenantId,
+      templateName: log.template_name,
+      recipient: to,
+      kind: "transactional",
+      metadata: { source: "email-resend", resent_from: log.id, resent_by: actorId, is_test: isTest },
+    });
+    if (!allowance.allowed) {
+      return json({
+        error: "Versand blockiert: Stunden-/Tageskontingent des Mandanten erreicht.",
+        code: allowance.reason,
+        count_1h: allowance.count1h,
+        count_24h: allowance.count24h,
+      }, 200);
+    }
 
     // ---------- Senden ----------
     const senderName = tenant.sender_name ?? tenant.name;
