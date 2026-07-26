@@ -4,6 +4,8 @@ import JSZip from "jszip";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getTheme } from "./landing-themes";
 import { THEME_ASSETS } from "./theme-assets.generated";
+import { buildLegalPage, renderImpressum, renderDatenschutz } from "./legal-content";
+
 
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Ungültige Hex-Farbe");
 
