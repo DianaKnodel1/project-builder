@@ -21,9 +21,12 @@ import nodemailer from "https://esm.sh/nodemailer@6.9.14";
 import {
   SEND_WINDOW_START_HOUR as WINDOW_START,
   SEND_WINDOW_END_HOUR as WINDOW_END,
+  MAX_PER_1H_PER_TENANT as LIMIT_1H,
+  MAX_PER_12H_PER_TENANT as LIMIT_12H,
   MAX_PER_24H_PER_TENANT as LIMIT_24H,
   MAX_SENDS_PER_RUN_PER_TENANT as LIMIT_RUN_TYPE,
 } from "../_shared/limits.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,11 +65,16 @@ function isQuietHours(): boolean {
 // Max. echte Sends pro Tenant + Typ und Ausführung (verhindert Burst-Send / Domain-Flagging).
 // Quiet-Hours 08–20 Uhr = 12 aktive Läufe/Tag → 50 * 12 = 600 Mails/12h/Tenant/Typ.
 const MAX_SENDS_PER_RUN_PER_TENANT = LIMIT_RUN_TYPE;
-// Harte Obergrenze: max. Mails pro Tenant in den letzten 24h (über alle Typen
-// zusammen). Welle-1-Update: User-Vorgabe 140/Tag/Tenant. Schützt Sender-
-// Reputation. Wird zu Beginn aus reminder_log geladen und pro erfolgreichem
-// Send live hochgezählt.
+// Harte Obergrenzen pro Tenant über alle Typen zusammen (zentral in
+// _shared/limits.ts): 150/h (SMTP-Vertrag), 1.800/12h, 2.400/24h.
+// Werden zu Beginn aus reminder_log + email_send_log geladen und pro
+// erfolgreichem Send live hochgezählt.
+const MAX_SENDS_PER_TENANT_PER_1H = LIMIT_1H;
+const MAX_SENDS_PER_TENANT_PER_12H = LIMIT_12H;
 const MAX_SENDS_PER_TENANT_PER_24H = LIMIT_24H;
+/** Status-Werte in email_send_log, die als echter Versand gegen die Kappen zählen. */
+const COUNTING_STATUSES = ["sent", "pending", "bounced", "complained"];
+
 // Eigenes Kontingent für Domain-Recovery: 20/Lauf × 12 aktive Läufe = 240/12h (real ≤200 durch Idempotenz).
 const DOMAIN_RECOVERY_CAP_PER_RUN = 20;
 // Auto-Trigger-Fenster: Recovery läuft automatisch X Tage nach Primary-Domain-Wechsel mit.
@@ -131,11 +139,16 @@ interface SendCtx {
   results: { type: ReminderType; email: string; status: string; error?: string }[];
   // Key: `${tenantId}:${reminderType}`
   sentCountByTenantType: Map<string, number>;
-  // Live-Zähler: Mails pro Tenant in den letzten 12h (alle Typen, inkl. heutigem Lauf).
+  // Live-Zähler pro Tenant (alle Typen, inkl. laufendem Run) je Zeitfenster.
+  sentCountByTenant1h: Map<string, number>;
   sentCountByTenant12h: Map<string, number>;
+  sentCountByTenant24h: Map<string, number>;
+  /** Grund der letzten Kappen-Blockade (für Log/Result). */
+  lastCapReason: string | null;
   // Recovery-spezifische Vorschau-Zähler (pro Tenant aggregiert):
   recoveryStats: Map<string, { total_eligible: number; would_send_this_run: number; already_done_since_change: number; no_change_anchor: boolean }>;
 }
+
 
 // Auth-Gate: nur Cron (mit CRON_SECRET) oder eingeloggter Admin dürfen triggern.
 async function authorize(req: Request, admin: any): Promise<{ ok: true } | { ok: false; status: number; msg: string }> {
@@ -215,21 +228,56 @@ serve(async (req) => {
       tenants.set(t.id, t as TenantRow);
     });
 
-    const ctx: SendCtx = { admin, tenants, dryRun, onlyEmail, results: [], sentCountByTenantType: new Map(), sentCountByTenant12h: new Map(), recoveryStats: new Map() };
+    const ctx: SendCtx = {
+      admin, tenants, dryRun, onlyEmail, results: [],
+      sentCountByTenantType: new Map(),
+      sentCountByTenant1h: new Map(),
+      sentCountByTenant12h: new Map(),
+      sentCountByTenant24h: new Map(),
+      lastCapReason: null,
+      recoveryStats: new Map(),
+    };
 
-    // 24h-Cap pro Tenant vorladen (alle bisherigen sent in den letzten 24h).
+    // Kontingente pro Tenant vorladen: 1h / 12h / 24h.
+    // Zwei Quellen (reminder_log + email_send_log) protokollieren dieselben
+    // Reminder-Mails, deshalb pro Fenster das MAXIMUM (nicht die Summe) nehmen —
+    // sonst würde jeder Reminder doppelt gegen das Kontingent zählen.
     {
-      const cutoff24h = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const { data: recent } = await admin
-        .from("reminder_log")
-        .select("tenant_id")
-        .eq("status", "sent")
-        .gte("sent_at", cutoff24h);
-      for (const r of (recent ?? []) as Array<{ tenant_id: string | null }>) {
-        if (!r.tenant_id) continue;
-        ctx.sentCountByTenant12h.set(r.tenant_id, (ctx.sentCountByTenant12h.get(r.tenant_id) ?? 0) + 1);
-      }
+      const now = Date.now();
+      const cutoff24h = new Date(now - 24 * 3600_000).toISOString();
+      const cutoff12h = now - 12 * 3600_000;
+      const cutoff1h = now - 3600_000;
+
+      const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
+      const tally = (rows: Array<{ tenant_id: string | null; ts: string | null }>) => {
+        const c1 = new Map<string, number>(), c12 = new Map<string, number>(), c24 = new Map<string, number>();
+        for (const r of rows) {
+          if (!r.tenant_id || !r.ts) continue;
+          const t = new Date(r.ts).getTime();
+          bump(c24, r.tenant_id);
+          if (t >= cutoff12h) bump(c12, r.tenant_id);
+          if (t >= cutoff1h) bump(c1, r.tenant_id);
+        }
+        return { c1, c12, c24 };
+      };
+
+      const [{ data: remRows }, { data: logRows }] = await Promise.all([
+        admin.from("reminder_log").select("tenant_id, sent_at").eq("status", "sent").gte("sent_at", cutoff24h),
+        admin.from("email_send_log").select("tenant_id, created_at").in("status", COUNTING_STATUSES).gte("created_at", cutoff24h),
+      ]);
+
+      const a = tally(((remRows ?? []) as any[]).map(r => ({ tenant_id: r.tenant_id, ts: r.sent_at })));
+      const b = tally(((logRows ?? []) as any[]).map(r => ({ tenant_id: r.tenant_id, ts: r.created_at })));
+      const merge = (target: Map<string, number>, x: Map<string, number>, y: Map<string, number>) => {
+        for (const id of new Set([...x.keys(), ...y.keys()])) {
+          target.set(id, Math.max(x.get(id) ?? 0, y.get(id) ?? 0));
+        }
+      };
+      merge(ctx.sentCountByTenant1h, a.c1, b.c1);
+      merge(ctx.sentCountByTenant12h, a.c12, b.c12);
+      merge(ctx.sentCountByTenant24h, a.c24, b.c24);
     }
+
 
     if (mode === "domain_recovery") {
       if (!recoveryTenantId) return json({ error: "tenant_id required for domain_recovery" }, 400);
@@ -392,15 +440,30 @@ function capReached(ctx: SendCtx, tenantId: string, type: ReminderType): boolean
   const key = `${tenantId}:${type}`;
   return (ctx.sentCountByTenantType.get(key) ?? 0) >= MAX_SENDS_PER_RUN_PER_TENANT;
 }
-// 24h-Obergrenze pro Tenant über alle Reminder-Typen (Welle-1-Cap: 140/Tag).
-function tenant12hCapReached(ctx: SendCtx, tenantId: string): boolean {
-  return (ctx.sentCountByTenant12h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_24H;
+/**
+ * Zentrale Volumen-Kappen pro Tenant über ALLE Reminder-Typen:
+ * 150/h, 1.800/12h, 2.400/24h (Werte aus _shared/limits.ts).
+ * Setzt ctx.lastCapReason, damit Log und Result den echten Grund zeigen.
+ */
+function tenantVolumeCapReached(ctx: SendCtx, tenantId: string): boolean {
+  ctx.lastCapReason = null;
+  if ((ctx.sentCountByTenant1h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_1H) {
+    ctx.lastCapReason = "tenant_1h_cap";
+  } else if ((ctx.sentCountByTenant12h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_12H) {
+    ctx.lastCapReason = "tenant_12h_cap";
+  } else if ((ctx.sentCountByTenant24h.get(tenantId) ?? 0) >= MAX_SENDS_PER_TENANT_PER_24H) {
+    ctx.lastCapReason = "tenant_24h_cap";
+  }
+  return ctx.lastCapReason !== null;
 }
 function bumpSent(ctx: SendCtx, tenantId: string, type: ReminderType) {
   const key = `${tenantId}:${type}`;
   ctx.sentCountByTenantType.set(key, (ctx.sentCountByTenantType.get(key) ?? 0) + 1);
+  ctx.sentCountByTenant1h.set(tenantId, (ctx.sentCountByTenant1h.get(tenantId) ?? 0) + 1);
   ctx.sentCountByTenant12h.set(tenantId, (ctx.sentCountByTenant12h.get(tenantId) ?? 0) + 1);
+  ctx.sentCountByTenant24h.set(tenantId, (ctx.sentCountByTenant24h.get(tenantId) ?? 0) + 1);
 }
+
 
 // Schreibt einen Eintrag in email_send_log (zentrale Logs-Tabelle, die das
 // Admin-UI /admin/email-logs anzeigt). Enthält gerendertes Subject/HTML und
@@ -499,7 +562,7 @@ async function runInvites(ctx: SendCtx) {
       continue;
     }
     if (capReached(ctx, tenant.id, "invite")) { ctx.results.push({ type: "invite", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "invite", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "invite", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "invite", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "invite", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "invite", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "invite");
     if (!gate.ok) { ctx.results.push({ type: "invite", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "invite", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "invite", gate.reason); continue; }
@@ -569,7 +632,7 @@ async function runConfirmEmail(ctx: SendCtx) {
 
     if (!hasValidSmtp(tenant)) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: "no_tenant_smtp" }); await logSkipped(ctx.admin, email, tenantId ?? null, "confirm_email", "no_tenant_smtp"); continue; }
     if (capReached(ctx, tenant.id, "confirm_email")) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "confirm_email");
     if (!gate.ok) { ctx.results.push({ type: "confirm_email", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "confirm_email", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "confirm_email", gate.reason); continue; }
@@ -631,7 +694,7 @@ async function runCompleteRegistration(ctx: SendCtx) {
     const tenant = (p as any).tenant_id ? ctx.tenants.get((p as any).tenant_id) : null;
     if (!hasValidSmtp(tenant)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "no_tenant_smtp" }); await logSkipped(ctx.admin, email, (p as any).tenant_id ?? null, "complete_registration", "no_tenant_smtp"); continue; }
     if (capReached(ctx, tenant.id, "complete_registration")) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "complete_registration");
     if (!gate.ok) { ctx.results.push({ type: "complete_registration", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "complete_registration", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "complete_registration", gate.reason); continue; }
@@ -706,7 +769,7 @@ async function runNoRecentBooking(ctx: SendCtx) {
       continue;
     }
     if (capReached(ctx, tenant.id, "no_recent_booking")) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: "tenant_run_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", "tenant_run_cap_reached"); continue; }
-    if (tenant12hCapReached(ctx, tenant.id)) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: "tenant_12h_cap_reached" }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", "tenant_12h_cap_reached"); continue; }
+    if (tenantVolumeCapReached(ctx, tenant.id)) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", (ctx.lastCapReason ?? "tenant_volume_cap")); continue; }
 
     const gate = await canSend(ctx.admin, email, "no_recent_booking");
     if (!gate.ok) { ctx.results.push({ type: "no_recent_booking", email, status: "skipped", error: gate.reason }); await logSkipped(ctx.admin, email, tenant.id, "no_recent_booking", gate.reason ?? "skip"); await maybeMarkCold(ctx.admin, email, tenant.id, "no_recent_booking", gate.reason); continue; }
@@ -821,9 +884,9 @@ async function runDomainRecovery(ctx: SendCtx, tenantId: string, opts: { retryFa
       await logSkipped(ctx.admin, rec.email, tenant.id, "domain_recovery", "recovery_run_cap_reached");
       continue;
     }
-    if (tenant12hCapReached(ctx, tenant.id)) {
-      ctx.results.push({ type: "domain_recovery", email: rec.email, status: "skipped", error: "tenant_12h_cap_reached" });
-      await logSkipped(ctx.admin, rec.email, tenant.id, "domain_recovery", "tenant_12h_cap_reached");
+    if (tenantVolumeCapReached(ctx, tenant.id)) {
+      ctx.results.push({ type: "domain_recovery", email: rec.email, status: "skipped", error: (ctx.lastCapReason ?? "tenant_volume_cap") });
+      await logSkipped(ctx.admin, rec.email, tenant.id, "domain_recovery", (ctx.lastCapReason ?? "tenant_volume_cap"));
       continue;
     }
 
